@@ -132,7 +132,7 @@ export default function Navbar() {
 
           {/* SIGN IN */}
           <Link
-            href="/login"
+            href="/sign-in"
             className="hidden rounded-full border border-[#B6F70B] px-5 py-2 text-[13px] font-semibold transition-all duration-200 hover:bg-[#B6F70B] hover:text-black sm:inline-flex"
           >
             Sign In
@@ -140,7 +140,7 @@ export default function Navbar() {
 
           {/* SIGN UP */}
           <Link
-            href="/signup"
+            href="/sign-up"
             className="hidden rounded-full bg-[#B6F70B] px-5 py-2 text-[13px] font-bold text-black transition-all duration-200 hover:bg-[#C9FF42] hover:shadow-[0_0_18px_rgba(182,247,11,0.3)] sm:inline-flex"
           >
             Sign Up
