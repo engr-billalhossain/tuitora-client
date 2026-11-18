@@ -216,7 +216,10 @@ export default function Banner() {
                 <div className="flex min-w-0 items-center gap-2 px-4">
                   <GraduationCap className="h-5 w-5 shrink-0 text-[#B6F70B]" />
 
-                  <Select value={classLevel} onValueChange={setClassLevel}>
+                  <Select
+                    value={classLevel}
+                    onValueChange={(value) => setClassLevel(value ?? "")}
+                  >
                     <SelectTrigger
                       aria-label="Select class level"
                       className="h-12 w-full min-w-0 border-0 bg-transparent text-sm text-gray-300 shadow-none focus:ring-0 focus-visible:ring-0"
@@ -248,7 +251,10 @@ export default function Banner() {
                 <div className="flex min-w-0 items-center gap-2 px-4">
                   <Monitor className="h-5 w-5 shrink-0 text-[#B6F70B]" />
 
-                  <Select value={mode} onValueChange={setMode}>
+                  <Select
+                    value={mode}
+                    onValueChange={(value) => setMode(value ?? "both")}
+                  >
                     <SelectTrigger
                       aria-label="Select tuition mode"
                       className="h-12 w-full min-w-0 border-0 bg-transparent text-sm text-gray-300 shadow-none focus:ring-0 focus-visible:ring-0"
