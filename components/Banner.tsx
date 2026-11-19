@@ -149,7 +149,7 @@ export default function Banner() {
             {/* Students Image */}
 
             <Image
-              src="/banner.png"
+              src="/bannerr.png"
               alt="Tuitora students and mentors"
               width={800}
               height={560}

@@ -133,7 +133,13 @@ export function UserMenu({ user }: { user: MenuUser }) {
   }
 
   const name = user.name?.trim() || "User"
-  const roleLabel = user.role === "tutor" ? "Tutor" : "Student"
+  const roleLabel =
+    user.role === "admin"
+      ? "Administrator"
+      : user.role === "tutor"
+        ? "Tutor"
+        : "Student"
+  const avatarSrc = user.role === "admin" ? "/admin.png" : user.image
 
   return (
     <div ref={containerRef} className="relative">
@@ -148,7 +154,7 @@ export function UserMenu({ user }: { user: MenuUser }) {
       >
         <span className="relative shrink-0">
           <Avatar
-            src={user.image}
+            src={avatarSrc}
             name={name}
             className="h-8 w-8 rounded-full text-[11px]"
           />
@@ -186,7 +192,7 @@ export function UserMenu({ user }: { user: MenuUser }) {
             <div className="flex flex-col items-center text-center">
               <div className="relative">
                 <Avatar
-                  src={user.image}
+                  src={avatarSrc}
                   name={name}
                   className="h-[74px] w-[74px] rounded-full text-xl ring-[3px] ring-[#B6F70B] ring-offset-2 ring-offset-white dark:ring-offset-[#11191C]"
                 />
