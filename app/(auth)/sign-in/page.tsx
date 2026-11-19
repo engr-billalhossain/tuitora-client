@@ -1,8 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+import { signIn } from "@/lib/auth-client"
 
 import {
   GraduationCap,
@@ -17,6 +20,7 @@ import {
   Star,
   ChartNoAxesColumnIncreasing,
   Check,
+  Loader2,
 } from "lucide-react"
 
 import {
@@ -31,6 +35,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
+import { Toaster } from "@/components/ui/sonner"
 
 type UserRole = "student" | "tutor"
 
@@ -54,18 +60,73 @@ const features = [
 ]
 
 export default function SignInPage() {
+  const router = useRouter()
+
   const [role, setRole] = useState<UserRole>("student")
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [socialLoading, setSocialLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
 
-    // Connect your authentication API here.
+    if (isLoading) return
+
+    const formData = new FormData(e.currentTarget)
+    const email = String(formData.get("email") || "").trim()
+
+    setIsLoading(true)
+
+    try {
+      const { error } = await signIn.email({
+        email,
+        password,
+        callbackURL: "/",
+      })
+
+      if (error) {
+        toast.error(error.message || "Invalid email or password")
+
+        return
+      }
+
+      toast.success("Signed in successfully!")
+
+      router.push("/")
+    } catch {
+      toast.error("Sign in failed. Try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    if (socialLoading) return
+
+    setSocialLoading(true)
+
+    try {
+      const { error } = await signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      })
+
+      if (error) {
+        toast.error(error.message || "Google sign-in failed")
+      }
+    } catch {
+      toast.error("Google sign-in failed. Try again.")
+    } finally {
+      setSocialLoading(false)
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#F3F7F1] p-2 transition-colors duration-300 sm:p-4 dark:bg-[#050B0E]">
+      <Toaster />
+
       <div className="mx-auto grid min-h-[calc(100vh-16px)] max-w-[1500px] overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-xl lg:grid-cols-2 dark:border-white/5 dark:bg-[#080D0F]">
         {/* =====================================
             LEFT BRANDING SECTION
@@ -221,6 +282,7 @@ export default function SignInPage() {
 
                   <Input
                     type="email"
+                    name="email"
                     placeholder="Email address"
                     aria-label="Email address"
                     autoComplete="email"
@@ -290,10 +352,20 @@ export default function SignInPage() {
 
                 <Button
                   type="submit"
-                  className="h-[50px] w-full gap-3 rounded-xl bg-[#B6F70B] text-sm font-bold text-[#11170A] shadow-sm hover:bg-[#C9FF42] hover:shadow-[0_5px_20px_rgba(182,247,11,0.2)]"
+                  disabled={isLoading}
+                  className="h-[50px] w-full gap-3 rounded-xl bg-[#B6F70B] text-sm font-bold text-[#11170A] shadow-sm hover:bg-[#C9FF42] hover:shadow-[0_5px_20px_rgba(182,247,11,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Sign In
-                  <ArrowRight className="h-5 w-5" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
                 </Button>
               </form>
 
@@ -314,30 +386,36 @@ export default function SignInPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-[46px] w-full gap-3 rounded-xl border-gray-200 bg-white text-sm font-semibold text-[#101418] hover:bg-gray-50 dark:border-[#303B42] dark:bg-[#1A252C] dark:text-white dark:hover:bg-[#223039]"
+                disabled={socialLoading}
+                onClick={handleGoogleLogin}
+                className="h-[46px] w-full gap-3 rounded-xl border-gray-200 bg-white text-sm font-semibold text-[#101418] hover:bg-gray-50 disabled:opacity-70 dark:border-[#303B42] dark:bg-[#1A252C] dark:text-white dark:hover:bg-[#223039]"
               >
-                <svg viewBox="0 0 24 24" className="h-5 w-5">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z"
-                  />
+                {socialLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z"
+                    />
 
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.15v2.84A11 11 0 0 0 12 23Z"
-                  />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.15v2.84A11 11 0 0 0 12 23Z"
+                    />
 
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.43.34-2.11V7.05H2.15A11 11 0 0 0 1 12c0 1.78.43 3.46 1.15 4.95l3.69-2.84Z"
-                  />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.43.34-2.11V7.05H2.15A11 11 0 0 0 1 12c0 1.78.43 3.46 1.15 4.95l3.69-2.84Z"
+                    />
 
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.36c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.85 6.05l3.69 2.84C6.71 7.29 9.14 5.36 12 5.36Z"
-                  />
-                </svg>
-                Continue with Google
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.36c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.85 6.05l3.69 2.84C6.71 7.29 9.14 5.36 12 5.36Z"
+                    />
+                  </svg>
+                )}
+                {socialLoading ? "Connecting..." : "Continue with Google"}
               </Button>
 
               {/* Sign Up */}

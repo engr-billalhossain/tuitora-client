@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import Link from "next/link"
-import Image from "next/image"
+import { useRouter } from "next/navigation"
+
+import { signUp, signIn, authClient } from "@/lib/auth-client"
 
 import {
   GraduationCap,
@@ -18,6 +20,7 @@ import {
   Star,
   ChartNoAxesColumnIncreasing,
   Check,
+  Loader2,
 } from "lucide-react"
 
 import {
@@ -30,28 +33,162 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 
 type UserRole = "student" | "tutor"
+
+type FormField = "fullName" | "email" | "password"
+
+type FormErrors = Partial<Record<FormField, string>>
 
 const features = [
   { icon: ShieldCheck, title: "Verified Tutors" },
   { icon: Monitor, title: "Online & Offline Classes" },
   { icon: Star, title: "Flexible & Affordable" },
-  { icon: ChartNoAxesColumnIncreasing, title: "Learn at Your Pace" },
+  {
+    icon: ChartNoAxesColumnIncreasing,
+    title: "Learn at Your Pace",
+  },
 ]
 
 export default function SignUpPage() {
+  const router = useRouter()
+
   const [role, setRole] = useState<UserRole>("student")
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [socialLoading, setSocialLoading] = useState(false)
+
+  const [errors, setErrors] = useState<FormErrors>({})
+
+  // Clear individual field error
+
+  const clearError = (field: FormField) => {
+    setErrors((prev) => ({
+      ...prev,
+      [field]: "",
+    }))
+  }
+
+  // ==================================
+  // SIGN UP
+  // ==================================
+
+
+
+
+  const handleSignUp = async (data: { name: string; email: string; password: string }) => {
+    const { data : signUpData, error } = await authClient.signUp.email({
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    callbackURL: "/",
+});
+  }
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // Connect registration API here.
+    
+
+    if (isLoading) return
+
+    const formData = new FormData(e.currentTarget)
+
+    const name = String(formData.get("fullName") || "").trim()
+    const email = String(formData.get("email") || "").trim()
+    const password = String(formData.get("password") || "")
+
+    const newErrors: FormErrors = {}
+
+    // Full Name Validation
+
+    if (name.length < 3) {
+      newErrors.fullName = "Name must be at least 3 characters"
+    }
+
+    // Email Validation
+
+    if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
+      newErrors.email = "Enter a valid email address"
+    }
+
+    // Password Validation
+
+    if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters"
+    } else if (!/[A-Z]/.test(password)) {
+      newErrors.password = "Include at least one uppercase letter"
+    } else if (!/[0-9]/.test(password)) {
+      newErrors.password = "Include at least one number"
+    }
+
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const { error } = await signUp.email({
+        name,
+        email,
+        password,
+        role,
+        callbackURL: "/",
+      })
+
+      if (error) {
+        toast.error(error.message || "Account could not be created!");
+
+        return
+      }
+
+      toast.success("Account created successfully!");
+
+      setTimeout(() => {
+        router.push("/")
+      }, 1000)
+    } catch {
+      toast.error("Account could not be created!");
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // ==================================
+  // GOOGLE SOCIAL LOGIN
+  // ==================================
+
+  const handleGoogleLogin = async () => {
+    if (socialLoading) return
+
+    setSocialLoading(true)
+
+    try {
+      const { error } = await signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      })
+
+      if (error) {
+        toast.error(error.message || "Google sign-in failed")
+      }
+    } catch {
+      toast.error("Google sign-in failed. Try again.")
+    } finally {
+      setSocialLoading(false)
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#F3F7F1] p-2 transition-colors duration-300 sm:p-4 dark:bg-[#050B0E]">
+      <Toaster />
+
       <div className="mx-auto grid min-h-[calc(100vh-16px)] max-w-[1500px] overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-xl lg:grid-cols-2 dark:border-white/5 dark:bg-[#080D0F]">
         {/* ==================================
             LEFT BRANDING SECTION
@@ -203,7 +340,7 @@ export default function SignUpPage() {
                   SIGNUP FORM
               ================================== */}
 
-              <form onSubmit={handleSubmit} className="space-y-3">
+              <form onSubmit={handleSubmit} noValidate className="space-y-3">
                 {/* Full Name */}
 
                 <div className="relative">
@@ -215,9 +352,16 @@ export default function SignUpPage() {
                     placeholder="Full name"
                     autoComplete="name"
                     required
+                    minLength={3}
+                    aria-invalid={!!errors.fullName}
+                    onChange={() => clearError("fullName")}
                     className="h-[47px] rounded-xl border-gray-200 bg-white pl-12 text-sm text-[#101418] placeholder:text-gray-500 focus-visible:border-[#B6F70B] focus-visible:ring-[#B6F70B]/20 dark:border-[#303B42] dark:bg-[#141D23] dark:text-white dark:placeholder:text-gray-400"
                   />
                 </div>
+
+                {errors.fullName && (
+                  <p className="text-xs text-red-500">{errors.fullName}</p>
+                )}
 
                 {/* Email */}
 
@@ -230,9 +374,15 @@ export default function SignUpPage() {
                     placeholder="Email address"
                     autoComplete="email"
                     required
+                    aria-invalid={!!errors.email}
+                    onChange={() => clearError("email")}
                     className="h-[47px] rounded-xl border-gray-200 bg-white pl-12 text-sm text-[#101418] placeholder:text-gray-500 focus-visible:border-[#B6F70B] focus-visible:ring-[#B6F70B]/20 dark:border-[#303B42] dark:bg-[#141D23] dark:text-white dark:placeholder:text-gray-400"
                   />
                 </div>
+
+                {errors.email && (
+                  <p className="text-xs text-red-500">{errors.email}</p>
+                )}
 
                 {/* Password */}
 
@@ -242,10 +392,12 @@ export default function SignUpPage() {
                   <Input
                     type={showPassword ? "text" : "password"}
                     name="password"
-                    placeholder="Password (min. 6 characters)"
+                    placeholder="Password (min. 8 characters)"
                     autoComplete="new-password"
-                    minLength={6}
+                    minLength={8}
                     required
+                    aria-invalid={!!errors.password}
+                    onChange={() => clearError("password")}
                     className="h-[47px] rounded-xl border-gray-200 bg-white pr-12 pl-12 text-sm text-[#101418] placeholder:text-gray-500 focus-visible:border-[#B6F70B] focus-visible:ring-[#B6F70B]/20 dark:border-[#303B42] dark:bg-[#141D23] dark:text-white dark:placeholder:text-gray-400"
                   />
 
@@ -265,19 +417,33 @@ export default function SignUpPage() {
                   </button>
                 </div>
 
+                {errors.password && (
+                  <p className="text-xs text-red-500">{errors.password}</p>
+                )}
+
                 {/* Create Account */}
 
                 <Button
                   type="submit"
-                  className="mt-1 flex h-[48px] w-full gap-3 rounded-xl bg-[#B6F70B] text-sm font-bold text-[#11170A] shadow-sm hover:bg-[#C9FF42] hover:shadow-[0_5px_20px_rgba(182,247,11,0.2)]"
+                  disabled={isLoading}
+                  className="mt-1 flex h-[48px] w-full gap-3 rounded-xl bg-[#B6F70B] text-sm font-bold text-[#11170A] shadow-sm hover:bg-[#C9FF42] hover:shadow-[0_5px_20px_rgba(182,247,11,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Create Account
-                  <ArrowRight className="h-5 w-5" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    <>
+                      Create Account
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
                 </Button>
               </form>
 
               {/* ==================================
-                  GOOGLE SIGNUP ONLY
+                  GOOGLE SIGNUP
               ================================== */}
 
               <div className="my-5 flex items-center gap-3">
@@ -293,27 +459,34 @@ export default function SignUpPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-[46px] w-full gap-3 rounded-xl border-gray-200 bg-white text-sm font-semibold text-[#101418] hover:bg-gray-50 dark:border-[#303B42] dark:bg-[#1A252C] dark:text-white dark:hover:bg-[#223039]"
+                disabled={socialLoading}
+                onClick={handleGoogleLogin}
+                className="h-[46px] w-full gap-3 rounded-xl border-gray-200 bg-white text-sm font-semibold text-[#101418] hover:bg-gray-50 disabled:opacity-70 dark:border-[#303B42] dark:bg-[#1A252C] dark:text-white dark:hover:bg-[#223039]"
               >
-                <svg viewBox="0 0 24 24" className="h-5 w-5">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.15v2.84A11 11 0 0 0 12 23Z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.43.34-2.11V7.05H2.15A11 11 0 0 0 1 12c0 1.78.43 3.46 1.15 4.95l3.69-2.84Z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.36c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.85 6.05l3.69 2.84C6.71 7.29 9.14 5.36 12 5.36Z"
-                  />
-                </svg>
-                Continue with Google
+                {socialLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.15v2.84A11 11 0 0 0 12 23Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.43.34-2.11V7.05H2.15A11 11 0 0 0 1 12c0 1.78.43 3.46 1.15 4.95l3.69-2.84Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.36c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.85 6.05l3.69 2.84C6.71 7.29 9.14 5.36 12 5.36Z"
+                    />
+                  </svg>
+                )}
+
+                {socialLoading ? "Connecting..." : "Continue with Google"}
               </Button>
 
               {/* Already Have Account */}

@@ -3,6 +3,9 @@
 import { useState } from "react"
 import Link from "next/link"
 
+import { useSession } from "@/lib/auth-client"
+import { UserMenu } from "@/components/user-menu"
+
 const navLinks = [
   { name: "Home", href: "/" },
   { name: "Browse Tuitions", href: "/tuitions" },
@@ -14,6 +17,9 @@ const navLinks = [
 export default function Navbar() {
   const [isDark, setIsDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const { data: session, isPending } = useSession()
+
+  const loggedInUser = session?.user
 
   // Theme Toggle
   const toggleTheme = () => {
@@ -130,21 +136,29 @@ export default function Navbar() {
             </span>
           </button>
 
-          {/* SIGN IN */}
-          <Link
-            href="/sign-in"
-            className="hidden rounded-full border border-[#B6F70B] px-5 py-2 text-[13px] font-semibold transition-all duration-200 hover:bg-[#B6F70B] hover:text-black sm:inline-flex"
-          >
-            Sign In
-          </Link>
+          {/* AUTH AREA */}
+          {!isPending &&
+            (loggedInUser ? (
+              <UserMenu user={loggedInUser} />
+            ) : (
+              <>
+                {/* SIGN IN */}
+                <Link
+                  href="/sign-in"
+                  className="hidden rounded-full border border-[#B6F70B] px-5 py-2 text-[13px] font-semibold transition-all duration-200 hover:bg-[#B6F70B] hover:text-black sm:inline-flex"
+                >
+                  Sign In
+                </Link>
 
-          {/* SIGN UP */}
-          <Link
-            href="/sign-up"
-            className="hidden rounded-full bg-[#B6F70B] px-5 py-2 text-[13px] font-bold text-black transition-all duration-200 hover:bg-[#C9FF42] hover:shadow-[0_0_18px_rgba(182,247,11,0.3)] sm:inline-flex"
-          >
-            Sign Up
-          </Link>
+                {/* SIGN UP */}
+                <Link
+                  href="/sign-up"
+                  className="hidden rounded-full bg-[#B6F70B] px-5 py-2 text-[13px] font-bold text-black transition-all duration-200 hover:bg-[#C9FF42] hover:shadow-[0_0_18px_rgba(182,247,11,0.3)] sm:inline-flex"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ))}
 
           {/* MOBILE MENU BUTTON */}
           <button
@@ -205,24 +219,31 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* MOBILE AUTH BUTTONS */}
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:hidden">
-            <Link
-              href="/login"
-              onClick={() => setMenuOpen(false)}
-              className="rounded-full border border-[#B6F70B] py-3 text-center text-sm font-semibold"
-            >
-              Sign In
-            </Link>
+          {/* MOBILE AUTH AREA */}
+          {!isPending &&
+            (loggedInUser ? (
+              <div className="mt-4 sm:hidden">
+                <UserMenu user={loggedInUser} />
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:hidden">
+                <Link
+                  href="/login"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-full border border-[#B6F70B] py-3 text-center text-sm font-semibold"
+                >
+                  Sign In
+                </Link>
 
-            <Link
-              href="/signup"
-              onClick={() => setMenuOpen(false)}
-              className="rounded-full bg-[#B6F70B] py-3 text-center text-sm font-bold text-black"
-            >
-              Sign Up
-            </Link>
-          </div>
+                <Link
+                  href="/signup"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-full bg-[#B6F70B] py-3 text-center text-sm font-bold text-black"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            ))}
         </div>
       )}
     </header>
