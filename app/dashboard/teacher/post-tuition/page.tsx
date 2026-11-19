@@ -1,0 +1,392 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import {
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  DollarSign,
+  GraduationCap,
+  ImagePlus,
+  MapPin,
+  PenLine,
+  Send,
+  Upload,
+  Users,
+  Video,
+  type LucideIcon,
+} from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { createTuition, saveLocalTuition } from "@/lib/actions/postTuitions"
+
+const TITLE_LIMIT = 100
+const DESCRIPTION_LIMIT = 500
+
+const subjects = [
+  "Mathematics",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "English",
+  "Bangla",
+  "Computer Science",
+  "Accounting",
+  "IELTS & Spoken English",
+]
+
+const classLevels = [
+  "Class 1 – 5",
+  "Class 6 – 8",
+  "Class 9 – 10",
+  "Class 11 – 12 (HSC)",
+  "University / Admission",
+  "Adult Learners",
+]
+
+const daysPerWeek = ["1 Day", "2 Days", "3 Days", "4 Days", "5 Days", "6 Days", "7 Days"]
+
+type Mode = "online" | "offline"
+
+function FieldLabel({
+  icon: Icon,
+  children,
+  required = false,
+  iconClassName,
+}: {
+  icon: LucideIcon
+  children: React.ReactNode
+  required?: boolean
+  iconClassName?: string
+}) {
+  return (
+    <span className="mb-2 flex items-center gap-2">
+      <Icon className={cn("h-3.5 w-3.5 text-gray-500", iconClassName)} />
+      <span className="text-[12px] font-semibold text-gray-300">
+        {children}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </span>
+    </span>
+  )
+}
+
+function SelectField({
+  value,
+  onChange,
+  placeholder,
+  options,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  options: string[]
+}) {
+  return (
+    <div className="relative">
+      <select
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={cn(
+          "h-10 w-full appearance-none rounded-lg border border-white/10 bg-[#141C21] pr-9 pl-3 text-[12px] outline-none transition-colors",
+          "focus:border-[#B6F70B]/50 focus:ring-2 focus:ring-[#B6F70B]/10",
+          value ? "text-gray-200" : "text-gray-600"
+        )}
+      >
+        <option value="" disabled className="bg-[#141C21] text-gray-500">
+          {placeholder}
+        </option>
+        {options.map((option) => (
+          <option key={option} value={option} className="bg-[#141C21] text-gray-200">
+            {option}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+    </div>
+  )
+}
+
+export default function PostTuitionPage() {
+  const router = useRouter()
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  const [title, setTitle] = React.useState("")
+  const [subject, setSubject] = React.useState("")
+  const [classLevel, setClassLevel] = React.useState("")
+  const [mode, setMode] = React.useState<Mode>("online")
+  const [fee, setFee] = React.useState("")
+  const [days, setDays] = React.useState("")
+  const [bannerName, setBannerName] = React.useState("")
+  const [description, setDescription] = React.useState("")
+  const [submitted, setSubmitted] = React.useState(false)
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const payload = {
+      title,
+      subject,
+      classLevel,
+      mode,
+      fee,
+      days,
+      bannerName,
+      description,
+    }
+
+    try {
+      const result = await createTuition(payload)
+      console.log("Tuition submission result:", result)
+    } catch (error) {
+      // Backend may be offline — still keep the entry so it shows in My Tuitions.
+      console.error("Error creating tuition:", error)
+    }
+
+    saveLocalTuition(payload)
+    setSubmitted(true)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  return (
+    <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
+      <div className="mx-auto max-w-[1100px] px-4 py-7 sm:px-6">
+        {/* ---------- HEADER ---------- */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#B6F70B]/50 bg-[#B6F70B]/5">
+              <GraduationCap className="h-5 w-5 text-[#B6F70B]" strokeWidth={2} />
+            </span>
+            <div>
+              <h1 className="text-[22px] leading-tight font-extrabold tracking-tight text-white">
+                Post a New Tuition
+              </h1>
+              <p className="mt-1.5 max-w-[640px] text-[11px] leading-relaxed text-gray-500">
+                Fill in the details about the subject, class level, mode, and fees.
+                Tutors will be reviewed by admin prior to publication.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {submitted && (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#B6F70B]/25 bg-[#B6F70B]/5 px-4 py-3 text-[12px] font-semibold text-[#B6F70B]">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Tuition submitted successfully! It will be published after admin review.
+            </span>
+            <Link
+              href="/dashboard/teacher/my-tuitions"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#B6F70B]/40 px-3 py-1.5 text-[11px] font-extrabold transition-colors hover:bg-[#B6F70B]/10"
+            >
+              View My Tuitions <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
+
+        {/* ---------- FORM CARD ---------- */}
+        <form
+          onSubmit={handleSubmit}
+          className="mt-5 rounded-2xl border border-white/[0.07] bg-[#0D1417] p-4 shadow-[0_8px_40px_rgba(0,0,0,0.25)] sm:p-6"
+        >
+          <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
+            {/* Tuition Title */}
+            <div>
+              <FieldLabel icon={BookOpen} required>
+                Tuition Title
+              </FieldLabel>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  maxLength={TITLE_LIMIT}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="e.g. Master HSC Higher Mathematics & Calculus"
+                  className="h-10 w-full rounded-lg border border-white/10 bg-[#141C21] pr-14 pl-3 text-[12px] text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-[#B6F70B]/50 focus:ring-2 focus:ring-[#B6F70B]/10"
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[10px] text-gray-600">
+                  {title.length}/{TITLE_LIMIT}
+                </span>
+              </div>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <FieldLabel icon={Circle} required iconClassName="text-[#B6F70B]">
+                Subject
+              </FieldLabel>
+              <SelectField
+                value={subject}
+                onChange={setSubject}
+                placeholder="Select Subject"
+                options={subjects}
+              />
+            </div>
+
+            {/* Class Level */}
+            <div>
+              <FieldLabel icon={GraduationCap} required>
+                Class Level
+              </FieldLabel>
+              <SelectField
+                value={classLevel}
+                onChange={setClassLevel}
+                placeholder="Select Class Level"
+                options={classLevels}
+              />
+            </div>
+
+            {/* Tuition Mode */}
+            <div>
+              <FieldLabel icon={Users} required>
+                Tuition Mode
+              </FieldLabel>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setMode("online")}
+                  className={cn(
+                    "flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-2 text-[11px] font-semibold transition-colors",
+                    mode === "online"
+                      ? "border-[#B6F70B]/70 bg-[#B6F70B]/5 text-[#B6F70B]"
+                      : "border-white/10 bg-[#141C21] text-gray-400 hover:border-white/20 hover:text-gray-200"
+                  )}
+                >
+                  <Video className="h-3.5 w-3.5 shrink-0" />
+                  Online (Zoom / Meet)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("offline")}
+                  className={cn(
+                    "flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-2 text-[11px] font-semibold transition-colors",
+                    mode === "offline"
+                      ? "border-[#B6F70B]/70 bg-[#B6F70B]/5 text-[#B6F70B]"
+                      : "border-white/10 bg-[#141C21] text-gray-400 hover:border-white/20 hover:text-gray-200"
+                  )}
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  Offline (In-Person / Home Visit)
+                </button>
+              </div>
+            </div>
+
+            <input type="hidden" name="mode" value={mode} />
+
+            {/* Monthly Fee */}
+            <div>
+              <FieldLabel icon={DollarSign} required>
+                Monthly Fee (USD)
+              </FieldLabel>
+              <div className="relative">
+                <DollarSign className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="number"
+                  min={0}
+                  required
+                  value={fee}
+                  onChange={(event) => setFee(event.target.value)}
+                  placeholder="e.g. 150"
+                  className="h-10 w-full rounded-lg border border-white/10 bg-[#141C21] pr-3 pl-8 text-[12px] text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-[#B6F70B]/50 focus:ring-2 focus:ring-[#B6F70B]/10"
+                />
+              </div>
+            </div>
+
+            {/* Days Per Week */}
+            <div>
+              <FieldLabel icon={CalendarDays} required>
+                Days Per Week
+              </FieldLabel>
+              <SelectField
+                value={days}
+                onChange={setDays}
+                placeholder="Select Days"
+                options={daysPerWeek}
+              />
+            </div>
+
+            {/* Banner Image */}
+            <div className="md:col-span-2">
+              <FieldLabel icon={ImagePlus}>Banner Image</FieldLabel>
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#10181C] px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#B6F70B]/25 bg-[#B6F70B]/5">
+                    <ImagePlus className="h-4 w-4 text-[#B6F70B]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] font-semibold text-gray-300">
+                      {bannerName || "Upload Banner Image (JPG, PNG)"}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-gray-600">
+                      Recommended size: 1200 x 600 (16:9)
+                    </p>
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={(event) => setBannerName(event.target.files?.[0]?.name || "")}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-[#182127] px-3 text-[11px] font-semibold text-gray-300 transition-colors hover:border-[#B6F70B]/40 hover:text-white"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Choose File
+                </button>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="md:col-span-2">
+              <FieldLabel icon={PenLine} required>
+                Tuition Description
+              </FieldLabel>
+              <div className="relative">
+                <textarea
+                  required
+                  maxLength={DESCRIPTION_LIMIT}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Describe what students will learn, your teaching methodology, prerequisites, and expected outcomes..."
+                  className="min-h-[108px] w-full resize-y rounded-lg border border-white/10 bg-[#141C21] p-3 pb-7 text-[12px] leading-relaxed text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-[#B6F70B]/50 focus:ring-2 focus:ring-[#B6F70B]/10"
+                />
+                <span className="pointer-events-none absolute right-3 bottom-2.5 text-[10px] text-gray-600">
+                  {description.length}/{DESCRIPTION_LIMIT} chars
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ---------- ACTIONS ---------- */}
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/teacher")}
+              className="h-10 rounded-lg border border-white/10 bg-[#141C21] px-5 text-[12px] font-semibold text-gray-300 transition-colors hover:border-white/20 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#B6F70B] px-5 text-[12px] font-extrabold text-[#0B1100] shadow-[0_4px_18px_rgba(182,247,11,0.2)] transition-colors hover:bg-[#C9FF42]"
+            >
+              <Send className="h-3.5 w-3.5" />
+              Post Tuition
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

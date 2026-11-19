@@ -12,24 +12,23 @@ import { cn } from "@/lib/utils"
 
 import {
   BookOpen,
-  Bookmark,
   ChevronDown,
   ChevronUp,
-  CircleHelp,
   ClipboardCheck,
   CreditCard,
   FileText,
   GraduationCap,
+  Landmark,
   LayoutDashboard,
   LogOut,
-  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Search,
   Settings,
   UserRound,
+  Users,
   UsersRound,
-  Wallet,
   type LucideIcon,
 } from "lucide-react"
 
@@ -454,6 +453,7 @@ export function StudentSidebar() {
 
 export function TeacherSidebar() {
   const { data: session } = useSession()
+  const pathname = usePathname()
   const user = session?.user
   const name = user?.name?.trim() || "Tutor"
 
@@ -466,13 +466,23 @@ export function TeacherSidebar() {
           icon={LayoutDashboard}
           label="Dashboard"
           href="/dashboard/teacher"
-          active
+          active={pathname === "/dashboard/teacher"}
         />
-        <NavItem icon={BookOpen} label="My Tuitions" />
-        <NavItem icon={ClipboardCheck} label="Applications" />
-        <NavItem icon={Wallet} label="Earnings" />
-        <NavItem icon={MessageCircle} label="Messages" />
-        <NavItem icon={UserRound} label="My Profile" />
+        <NavItem icon={BookOpen} label="Overview" />
+        <NavItem
+          icon={Plus}
+          label="Post Tuition"
+          href="/dashboard/teacher/post-tuition"
+          active={pathname === "/dashboard/teacher/post-tuition"}
+        />
+        <NavItem
+          icon={Landmark}
+          label="My Tuitions"
+          href="/dashboard/teacher/my-tuitions"
+          active={pathname === "/dashboard/teacher/my-tuitions"}
+        />
+        <NavItem icon={Users} label="Applicants" />
+        <NavItem icon={UserRound} label="Update Profile" />
       </nav>
 
       <div className="shrink-0 space-y-3">

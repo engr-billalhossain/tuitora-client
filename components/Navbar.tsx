@@ -6,12 +6,25 @@ import Link from "next/link"
 import { useSession } from "@/lib/auth-client"
 import { UserMenu } from "@/components/user-menu"
 
-const navLinks = [
+type NavLink = {
+  name: string
+  href: string
+  disabled?: boolean
+}
+
+const publicNavLinks: NavLink[] = [
   { name: "Home", href: "/" },
   { name: "Browse Tuitions", href: "/tuitions" },
   { name: "Pricing / Pro Plans", href: "/pricing" },
   { name: "How It Works", href: "/how-it-works" },
   { name: "About", href: "/about" },
+]
+
+// Admins only see these three links in the top navbar.
+const adminNavLinks: NavLink[] = [
+  { name: "Home", href: "/" },
+  { name: "Browse Tuitions", href: "#", disabled: true },
+  { name: "Dashboard", href: "/dashboard/admin" },
 ]
 
 export default function Navbar() {
@@ -20,6 +33,8 @@ export default function Navbar() {
   const { data: session, isPending } = useSession()
 
   const loggedInUser = session?.user
+  const isAdmin = loggedInUser?.role === "admin"
+  const navLinks = isAdmin ? adminNavLinks : publicNavLinks
 
   // Theme Toggle
   const toggleTheme = () => {
@@ -74,10 +89,13 @@ export default function Navbar() {
             <Link
               key={link.name}
               href={link.href}
+              onClick={link.disabled ? (event) => event.preventDefault() : undefined}
               className={`relative py-6 text-[13px] font-semibold transition-colors duration-200 ${
-                index === 0
-                  ? "text-[#B6F70B] after:absolute after:bottom-3 after:left-0 after:h-[2px] after:w-full after:bg-[#B6F70B]"
-                  : navText
+                link.disabled
+                  ? "cursor-not-allowed opacity-60"
+                  : index === 0
+                    ? "text-[#B6F70B]"
+                    : navText
               }`}
             >
               {link.name}
@@ -209,9 +227,17 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 href={link.href}
-                onClick={() => setMenuOpen(false)}
+                onClick={
+                  link.disabled
+                    ? (event) => event.preventDefault()
+                    : () => setMenuOpen(false)
+                }
                 className={`rounded-lg px-4 py-3 text-sm font-semibold transition-colors ${
-                  index === 0 ? "bg-[#B6F70B]/10 text-[#78B900]" : navText
+                  link.disabled
+                    ? "cursor-not-allowed opacity-60"
+                    : index === 0
+                      ? "bg-[#B6F70B]/10 text-[#78B900]"
+                      : navText
                 }`}
               >
                 {link.name}
