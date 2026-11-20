@@ -4,12 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  AlertCircle,
   ArrowRight,
   BookOpen,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   Circle,
+  Clock3,
   DollarSign,
   GraduationCap,
   ImagePlus,
@@ -23,7 +25,8 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { createTuition, saveLocalTuition } from "@/lib/actions/postTuitions"
+import { createTuition } from "@/lib/actions/postTuitions"
+import { TUITION_SLOTS } from "@/lib/slots"
 
 const TITLE_LIMIT = 100
 const DESCRIPTION_LIMIT = 500
@@ -124,10 +127,23 @@ export default function PostTuitionPage() {
   const [days, setDays] = React.useState("")
   const [bannerName, setBannerName] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [slots, setSlots] = React.useState<string[]>(
+    () => TUITION_SLOTS.map((slot) => slot.id)
+  )
   const [submitted, setSubmitted] = React.useState(false)
+  const [submitting, setSubmitting] = React.useState(false)
+  const [error, setError] = React.useState("")
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setSubmitting(true)
+    setError("")
+
+    if (slots.length === 0) {
+      setError("Please select at least one available time slot.")
+      setSubmitting(false)
+      return
+    }
 
     const payload = {
       title,
@@ -138,19 +154,22 @@ export default function PostTuitionPage() {
       days,
       bannerName,
       description,
+      slots,
     }
 
     try {
-      const result = await createTuition(payload)
-      console.log("Tuition submission result:", result)
-    } catch (error) {
-      // Backend may be offline — still keep the entry so it shows in My Tuitions.
-      console.error("Error creating tuition:", error)
+      await createTuition(payload)
+      setSubmitted(true)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not submit the tuition. Please try again."
+      )
+    } finally {
+      setSubmitting(false)
     }
-
-    saveLocalTuition(payload)
-    setSubmitted(true)
-    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   return (
@@ -187,6 +206,13 @@ export default function PostTuitionPage() {
             >
               View My Tuitions <ArrowRight className="h-3.5 w-3.5" />
             </Link>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-3 text-[12px] font-semibold text-rose-300">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
           </div>
         )}
 
@@ -312,6 +338,59 @@ export default function PostTuitionPage() {
               />
             </div>
 
+            {/* Daily time slots */}
+            <div className="md:col-span-2">
+              <FieldLabel icon={Clock3} required>
+                Available Time Slots (per day)
+              </FieldLabel>
+              <p className="mb-2 text-[10px] text-gray-500">
+                Choose the slots you can teach. The same subject can be posted
+                again with different slots. Students can only book a slot you
+                select here.
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                {TUITION_SLOTS.map((slot) => {
+                  const checked = slots.includes(slot.id)
+                  return (
+                    <label
+                      key={slot.id}
+                      className={cn(
+                        "cursor-pointer rounded-lg border p-2.5 transition-colors",
+                        checked
+                          ? "border-[#B6F70B]/60 bg-[#B6F70B]/[0.07]"
+                          : "border-white/10 bg-[#141C21] hover:border-white/20"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setSlots((current) =>
+                            current.includes(slot.id)
+                              ? current.filter((id) => id !== slot.id)
+                              : [...current, slot.id]
+                          )
+                        }
+                        className="h-3 w-3 accent-[#B6F70B]"
+                      />
+                      <p className="mt-1.5 text-[10px] font-bold text-white">
+                        {slot.label}
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-semibold text-[#B6F70B]">
+                        {slot.start} – {slot.end}
+                      </p>
+                      <p className="mt-0.5 text-[9px] text-gray-500">
+                        {slot.duration}
+                      </p>
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-[10px] font-semibold text-gray-500">
+                {slots.length} of {TUITION_SLOTS.length} slots selected
+              </p>
+            </div>
+
             {/* Banner Image */}
             <div className="md:col-span-2">
               <FieldLabel icon={ImagePlus}>Banner Image</FieldLabel>
@@ -379,10 +458,11 @@ export default function PostTuitionPage() {
             </button>
             <button
               type="submit"
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#B6F70B] px-5 text-[12px] font-extrabold text-[#0B1100] shadow-[0_4px_18px_rgba(182,247,11,0.2)] transition-colors hover:bg-[#C9FF42]"
+              disabled={submitting}
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#B6F70B] px-5 text-[12px] font-extrabold text-[#0B1100] shadow-[0_4px_18px_rgba(182,247,11,0.2)] transition-colors hover:bg-[#C9FF42] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Send className="h-3.5 w-3.5" />
-              Post Tuition
+              {submitting ? "Submitting..." : "Post Tuition"}
             </button>
           </div>
         </form>

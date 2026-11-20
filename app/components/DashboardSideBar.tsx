@@ -373,6 +373,7 @@ function UserPill({
 
 export function AdminSidebar() {
   const { data: session } = useSession()
+  const pathname = usePathname()
   const user = session?.user
   const name = user?.name?.trim() || "Admin Ruhan"
 
@@ -385,14 +386,19 @@ export function AdminSidebar() {
             icon={LayoutDashboard}
             label="Dashboard"
             href="/dashboard/admin"
-            active
+            active={pathname === "/dashboard/admin"}
           />
         </div>
 
         <div className="space-y-1">
           <SectionLabel>Platform Management</SectionLabel>
           <NavItem icon={UsersRound} label="Users & Roles" />
-          <NavItem icon={ClipboardCheck} label="Tuition Approvals" />
+          <NavItem
+            icon={ClipboardCheck}
+            label="Tuition Approvals"
+            href="/dashboard/admin/tuitions"
+            active={pathname === "/dashboard/admin/tuitions"}
+          />
           <NavItem icon={CreditCard} label="Transactions" />
         </div>
 
@@ -420,6 +426,7 @@ export function AdminSidebar() {
 
 export function StudentSidebar() {
   const { data: session } = useSession()
+  const pathname = usePathname()
   const user = session?.user
   const name = user?.name?.trim() || "Student"
 
@@ -432,10 +439,15 @@ export function StudentSidebar() {
           icon={LayoutDashboard}
           label="Dashboard"
           href="/dashboard/student"
-          active
+          active={pathname === "/dashboard/student"}
         />
-        <NavItem icon={Search} label="Find Tuitions" />
-        <NavItem icon={FileText} label="My Applications" />
+        <NavItem icon={Search} label="Find Tuitions" href="/tuitions" />
+        <NavItem
+          icon={FileText}
+          label="My Applications"
+          href="/dashboard/student/applications"
+          active={pathname === "/dashboard/student/applications"}
+        />
         <NavItem icon={UserRound} label="My Profile" />
       </nav>
 

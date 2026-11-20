@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  AlertCircle,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -10,16 +11,15 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
-  CreditCard,
-  Download,
   GraduationCap,
   Layers3,
   Menu,
+  RefreshCw,
   Search,
   UserPlus,
   UsersRound,
-  Wallet,
   X,
+  XCircle,
   Zap,
   type LucideIcon,
 } from "lucide-react"
@@ -38,212 +38,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  updateTuitionStatus,
+  type Tuition,
+} from "@/lib/actions/postTuitions"
 
 /* ============================================================================
-   🔌 DYNAMIC DATA — SOURCE GUIDE
-   ----------------------------------------------------------------------------
-   Ekhon shob gulo dummy data. Backend connect korar somoy nicher const guloke
-   API response diye replace korun (eva state/props hishebe pass korun).
-
-   GET /api/admin/overview              -> overviewStats (stat cards)
-   GET /api/admin/tuitions?status=pending -> tuitionQueue  (approval queue)
-   GET /api/admin/transactions          -> transactions   (recent transactions)
-   GET /api/admin/activity              -> activities     (platform activity)
-   GET /api/admin/users/role-distribution -> roleDistribution (donut chart)
+   All data below comes from GET /api/admin/overview (MongoDB).
    ========================================================================== */
 
-// 🔌 DYNAMIC: GET /api/admin/overview — date range loop e API query parameter hishebe pathano hobe.
-const overviewStats = {
-  totalUsers: 12_840,
-  usersChange: "+12.5%",
-  students: 10_280,
-  tutors: 2_560,
-  tutorsChange: "+8.4%",
-  moderationPending: 18,
-  moderationApproved: 342,
-  stripeRevenue: "$24,680",
-  revenueChange: "+8.7%",
+type AdminStats = {
+  totalUsers: number
+  students: number
+  tutors: number
+  admins: number
+  totalTuitions: number
+  pending: number
+  approved: number
+  declined: number
 }
 
-// 🔌 DYNAMIC: GET /api/admin/tuitions?status=pending — approve/reject e POST/PATCH call hobe.
-type TuitionRow = {
-  id: number
-  title: string
-  tutor: string
-  email: string
-  subject: string
-  submitted: string
-}
-
-const tuitionQueue: TuitionRow[] = [
-  {
-    id: 1,
-    title: "HSC Physics - Full Course",
-    tutor: "Md. Rake Khan",
-    email: "rake.khan@tuitora.com",
-    subject: "Physics - HSC",
-    submitted: "Nov 18, 2026",
-  },
-  {
-    id: 2,
-    title: "Class 8 Math (Bangla Medium)",
-    tutor: "Afroz Jahan",
-    email: "afroz.jahan@tuitora.com",
-    subject: "Math - Class 8",
-    submitted: "Nov 18, 2026",
-  },
-  {
-    id: 3,
-    title: "English for IELTS (Basics)",
-    tutor: "Nurod Hasan",
-    email: "nurod.hasan@tuitora.com",
-    subject: "English - IELTS",
-    submitted: "Nov 16, 2026",
-  },
-  {
-    id: 4,
-    title: "Class 10 Chemistry",
-    tutor: "Sadia Islam",
-    email: "sadia.islam@tuitora.com",
-    subject: "Chemistry - Class 10",
-    submitted: "Nov 18, 2026",
-  },
-  {
-    id: 5,
-    title: "Admission - Varsity Math",
-    tutor: "Tanjim Alam",
-    email: "tanjim.alam@tuitora.com",
-    subject: "Math - Admission",
-    submitted: "Nov 17, 2026",
-  },
-]
-
-// 🔌 DYNAMIC: GET /api/admin/transactions — stripe webhook/DB theke paid transactions asbe.
-type TransactionRow = {
-  id: number
-  user: string
-  email: string
-  role: "Student" | "Tutor"
-  plan: string
-  amount: string
-  txnId: string
-  date: string
-  status: "Paid"
-}
-
-const transactions: TransactionRow[] = [
-  {
-    id: 1,
-    user: "Rafsan Uddin",
-    email: "rafsan.uddin@example.com",
-    role: "Student",
-    plan: "Pro (Monthly)",
-    amount: "$9.90",
-    txnId: "pi_3Qw7zK...8wdf",
-    date: "Nov 19, 2026",
-    status: "Paid",
-  },
-  {
-    id: 2,
-    user: "Sumaiya Akter",
-    email: "sumaiya.akter@example.com",
-    role: "Tutor",
-    plan: "Pro (Monthly)",
-    amount: "$9.90",
-    txnId: "pi_3Qw7z...9dhn",
-    date: "Nov 18, 2026",
-    status: "Paid",
-  },
-  {
-    id: 3,
-    user: "Arif Hossain",
-    email: "arif.hossain@example.com",
-    role: "Student",
-    plan: "Pro (Yearly)",
-    amount: "$99.00",
-    txnId: "pi_3Qw7zK...2a9d",
-    date: "Nov 17, 2026",
-    status: "Paid",
-  },
-  {
-    id: 4,
-    user: "Jubaid Hasan",
-    email: "jubaid.hasan@example.com",
-    role: "Student",
-    plan: "Pro (Monthly)",
-    amount: "$9.90",
-    txnId: "pi_3Qw7z...7hjk",
-    date: "Nov 17, 2026",
-    status: "Paid",
-  },
-  {
-    id: 5,
-    user: "Nusrat Jahan",
-    email: "nusrat.jahan@example.com",
-    role: "Tutor",
-    plan: "Pro (Monthly)",
-    amount: "$9.90",
-    txnId: "pi_3Qw7z...4vPr",
-    date: "Nov 15, 2026",
-    status: "Paid",
-  },
-]
-
-// 🔌 DYNAMIC: GET /api/admin/activity — realtime activity feed (websocket/polling) hote pare.
 type ActivityItem = {
-  id: number
-  icon: LucideIcon
-  iconClass: string
+  id: string
+  kind: "tuition" | "user"
   title: string
   detail: string
   time: string
 }
 
-const activities: ActivityItem[] = [
-  {
-    id: 1,
-    icon: UserPlus,
-    iconClass: "bg-[#B6F70B]/12 text-[#B6F70B]",
-    title: "New user registered",
-    detail: "Rafsan Uddin joined the platform.",
-    time: "2 min ago",
-  },
-  {
-    id: 2,
-    icon: BookOpen,
-    iconClass: "bg-[#38BDF8]/12 text-[#38BDF8]",
-    title: "New tuition submitted",
-    detail: "HSC Physics - Full Course by Tanvir Akter.",
-    time: "12 min ago",
-  },
-  {
-    id: 3,
-    icon: CreditCard,
-    iconClass: "bg-[#A78BFA]/12 text-[#A78BFA]",
-    title: "Pro subscription purchased",
-    detail: "Rafsan Uddin upgraded to Pro Plan.",
-    time: "28 min ago",
-  },
-  {
-    id: 4,
-    icon: GraduationCap,
-    iconClass: "bg-[#F5B849]/12 text-[#F5B849]",
-    title: "New tutor registered",
-    detail: "Samiya Akter (Tutor) joined the platform.",
-    time: "42 min ago",
-  },
-]
+type RoleSlice = { label: string; count: number; percent: string; dot: string }
 
-// 🔌 DYNAMIC: GET /api/admin/users/role-distribution — count + percentage backend theke asbe.
-const roleDistribution = [
-  { label: "Students", count: "10,280", percent: "80.1%", dot: "bg-[#B6F70B]" },
-  { label: "Tutors", count: "2,560", percent: "20.0%", dot: "bg-[#7DB52E]" },
-  { label: "Admins", count: "12", percent: "0.1%", dot: "bg-[#5B686B]" },
-]
-
-/* ============================================================================
-   SMALL SHARED UI HELPERS
-   ========================================================================== */
+type AdminOverview = {
+  stats: AdminStats
+  queue: Tuition[]
+  recentTuitions: Tuition[]
+  recentUsers: {
+    id: string
+    name: string
+    email: string
+    role: string
+    createdAt?: string
+  }[]
+  roleDistribution: RoleSlice[]
+  activities: ActivityItem[]
+}
 
 const cardClass =
   "gap-0 rounded-xl border border-white/[0.07] bg-[#11181B] p-0 text-white shadow-none ring-0"
@@ -255,6 +93,18 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("")
+}
+
+function formatDate(value?: string) {
+  if (!value) return "—"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
 }
 
 function PanelHeading({
@@ -274,7 +124,6 @@ function PanelHeading({
         <Icon className="h-4 w-4 text-[#B6F70B]" />
         {children}
       </CardTitle>
-      {/* 🔌 DYNAMIC: ei link gulo route e badhano hobe (e.g. /dashboard/admin/tuitions). */}
       <a
         href={href}
         className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#B6F70B] transition-colors hover:text-[#C9FF42]"
@@ -286,21 +135,15 @@ function PanelHeading({
   )
 }
 
-/* ============================================================================
-   STAT CARDS
-   ========================================================================== */
-
 function StatCard({
   icon: Icon,
   label,
   value,
-  change,
   children,
 }: {
   icon: LucideIcon
   label: string
   value?: string
-  change?: string
   children?: React.ReactNode
 }) {
   return (
@@ -310,12 +153,10 @@ function StatCard({
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#B6F70B]/[0.12] text-[#B6F70B]">
             <Icon className="h-[18px] w-[18px]" />
           </div>
-          {change && (
-            <Badge className="h-5 gap-0.5 rounded-full bg-[#B6F70B]/[0.12] px-2 text-[10px] font-bold text-[#B6F70B] hover:bg-[#B6F70B]/[0.12]">
-              <ArrowUpRight className="h-3 w-3" />
-              {change}
-            </Badge>
-          )}
+          <Badge className="h-5 gap-0.5 rounded-full bg-[#B6F70B]/[0.12] px-2 text-[10px] font-bold text-[#B6F70B] hover:bg-[#B6F70B]/[0.12]">
+            <ArrowUpRight className="h-3 w-3" />
+            Live
+          </Badge>
         </div>
 
         <p className="mt-3 text-[12px] font-medium text-gray-400">{label}</p>
@@ -330,26 +171,27 @@ function StatCard({
   )
 }
 
-function StatCards() {
+function StatCards({ stats }: { stats: AdminStats }) {
+  const tutorShare =
+    stats.totalUsers === 0 ? 0 : (stats.tutors / stats.totalUsers) * 100
+
   return (
-    // 🔌 DYNAMIC: overviewStats object API response diye replace korun.
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
         icon={UsersRound}
         label="Total Users"
-        value={overviewStats.totalUsers.toLocaleString("en-US")}
-        change={overviewStats.usersChange}
+        value={stats.totalUsers.toLocaleString("en-US")}
       >
         <div className="mt-3 flex items-center gap-4 border-t border-white/[0.06] pt-3">
           <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
             <UsersRound className="h-3.5 w-3.5 text-[#B6F70B]/70" />
             Students
-            <b className="text-white">{overviewStats.students.toLocaleString("en-US")}</b>
+            <b className="text-white">{stats.students.toLocaleString("en-US")}</b>
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
             <GraduationCap className="h-3.5 w-3.5 text-[#B6F70B]/70" />
             Tutors
-            <b className="text-white">{overviewStats.tutors.toLocaleString("en-US")}</b>
+            <b className="text-white">{stats.tutors.toLocaleString("en-US")}</b>
           </span>
         </div>
       </StatCard>
@@ -357,271 +199,338 @@ function StatCards() {
       <StatCard
         icon={GraduationCap}
         label="Total Tutors"
-        value={overviewStats.tutors.toLocaleString("en-US")}
-        change={overviewStats.tutorsChange}
+        value={stats.tutors.toLocaleString("en-US")}
       >
-        {/* 🔌 DYNAMIC: sparkline data (last 30 days tutor growth) API theke asbe. */}
-        <svg
-          viewBox="0 0 200 42"
-          preserveAspectRatio="none"
-          className="mt-2 h-10 w-full"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="tutorSparkFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#B6F70B" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#B6F70B" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0 34 C 18 33, 28 26, 44 29 S 70 19, 86 23 S 110 11, 126 15 S 152 5, 168 9 S 188 2, 200 3 L200 42 L0 42 Z"
-            fill="url(#tutorSparkFill)"
-          />
-          <path
-            d="M0 34 C 18 33, 28 26, 44 29 S 70 19, 86 23 S 110 11, 126 15 S 152 5, 168 9 S 188 2, 200 3"
-            fill="none"
-            stroke="#B6F70B"
-            strokeWidth="2"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-[10px] font-semibold text-gray-500">
+            <span>Share of all users</span>
+            <span className="text-[#B6F70B]">{tutorShare.toFixed(1)}%</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full rounded-full bg-[#B6F70B]"
+              style={{ width: `${tutorShare}%` }}
+            />
+          </div>
+        </div>
       </StatCard>
 
       <StatCard icon={Layers3} label="Tuition Moderation">
-        {/* 🔌 DYNAMIC: pending/approved count API theke asbe. */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-3 gap-2">
           <div>
             <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
               <span className="h-1.5 w-1.5 rounded-full bg-[#F5B849]" />
               Pending
             </span>
             <p className="mt-1 text-[22px] leading-none font-extrabold text-white">
-              {overviewStats.moderationPending}
+              {stats.pending}
             </p>
           </div>
-          <div className="border-l border-white/[0.06] pl-3">
+          <div className="border-l border-white/[0.06] pl-2">
             <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
               <span className="h-1.5 w-1.5 rounded-full bg-[#B6F70B]" />
               Approved
             </span>
             <p className="mt-1 text-[22px] leading-none font-extrabold text-white">
-              {overviewStats.moderationApproved}
+              {stats.approved}
+            </p>
+          </div>
+          <div className="border-l border-white/[0.06] pl-2">
+            <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+              Declined
+            </span>
+            <p className="mt-1 text-[22px] leading-none font-extrabold text-white">
+              {stats.declined}
             </p>
           </div>
         </div>
       </StatCard>
 
       <StatCard
-        icon={Wallet}
-        label="Total Stripe Revenue"
-        value={overviewStats.stripeRevenue}
-        change={overviewStats.revenueChange}
+        icon={BookOpen}
+        label="Total Tuitions"
+        value={stats.totalTuitions.toLocaleString("en-US")}
       >
-        {/* 🔌 DYNAMIC: revenue bar chart data (monthly/daily) API theke asbe. */}
-        <div className="mt-3 flex h-10 items-end gap-[3px]">
-          {[24, 36, 30, 48, 42, 58, 50, 70, 62, 84, 76, 100].map((h, i) => (
-            <span
-              key={i}
-              className="flex-1 rounded-sm bg-[#B6F70B]/80"
-              style={{ height: `${h}%` }}
-            />
-          ))}
+        <div className="mt-3 flex items-center gap-4 border-t border-white/[0.06] pt-3 text-[11px] text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#B6F70B]" />
+            Published <b className="text-white">{stats.approved}</b>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <XCircle className="h-3.5 w-3.5 text-rose-400" />
+            Hidden <b className="text-white">{stats.declined}</b>
+          </span>
         </div>
       </StatCard>
     </section>
   )
 }
 
-/* ============================================================================
-   TUITION APPROVAL QUEUE
-   ========================================================================== */
+function StatusPill({ status }: { status?: string }) {
+  const value = (status || "pending").toLowerCase()
+  const approved = value === "approved"
+  const declined = value === "declined"
 
-function TuitionApprovalQueue() {
   return (
-    <Card className={cardClass}>
-      <PanelHeading icon={ClipboardCheck}>Tuition Approval Queue</PanelHeading>
-      <CardContent className="px-0 pb-1">
-        <Table className="text-[11px]">
-          <TableHeader>
-            <TableRow className="border-white/[0.06] hover:bg-transparent">
-              <TableHead className="h-9 w-8 pl-4 text-[10px] font-semibold text-gray-500">#</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Tuition Title</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Tutor</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Subject / Class</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Submitted</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Status</TableHead>
-              <TableHead className="h-9 pr-4 text-[10px] font-semibold text-gray-500">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tuitionQueue.map((row) => (
-              <TableRow key={row.id} className="border-white/[0.05] hover:bg-white/[0.02]">
-                <TableCell className="pl-4 text-gray-500">{row.id}</TableCell>
-                <TableCell className="font-semibold text-white">{row.title}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Avatar size="sm" className="h-7 w-7">
-                      <AvatarFallback className="bg-[#B6F70B]/15 text-[9px] font-bold text-[#B6F70B]">
-                        {initials(row.tutor)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="leading-tight">
-                      <p className="font-semibold text-white">{row.tutor}</p>
-                      <p className="text-[9px] text-gray-500">{row.email}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-gray-400">{row.subject}</TableCell>
-                <TableCell className="text-gray-400">{row.submitted}</TableCell>
-                <TableCell>
-                  <Badge className="h-5 rounded-full bg-[#F5B849]/[0.12] px-2 text-[10px] font-bold text-[#F5B849] hover:bg-[#F5B849]/[0.12]">
-                    Pending
-                  </Badge>
-                </TableCell>
-                <TableCell className="pr-4">
-                  <div className="flex items-center gap-1.5">
-                    {/* 🔌 DYNAMIC: PATCH /api/admin/tuitions/:id/approve */}
-                    <Button
-                      size="xs"
-                      className="h-6 gap-1 rounded-md bg-[#B6F70B]/[0.12] px-2 text-[10px] font-bold text-[#B6F70B] hover:bg-[#B6F70B]/20"
-                    >
-                      <Check className="h-3 w-3" />
-                      Approve
-                    </Button>
-                    {/* 🔌 DYNAMIC: PATCH /api/admin/tuitions/:id/reject */}
-                    <Button
-                      size="xs"
-                      className="h-6 gap-1 rounded-md bg-[#F43F5E]/10 px-2 text-[10px] font-bold text-[#FB7185] hover:bg-[#F43F5E]/20"
-                    >
-                      <X className="h-3 w-3" />
-                      Reject
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <Badge
+      className={cn(
+        "h-5 rounded-full px-2 text-[10px] font-bold hover:bg-transparent",
+        approved
+          ? "bg-[#B6F70B]/[0.12] text-[#B6F70B]"
+          : declined
+            ? "bg-rose-500/10 text-rose-300"
+            : "bg-[#F5B849]/[0.12] text-[#F5B849]"
+      )}
+    >
+      {approved ? "Approved" : declined ? "Declined" : "Pending"}
+    </Badge>
   )
 }
 
-/* ============================================================================
-   RECENT TRANSACTIONS
-   ========================================================================== */
-
-function RecentTransactions() {
+function TuitionApprovalQueue({
+  queue,
+  busyId,
+  onReview,
+}: {
+  queue: Tuition[]
+  busyId: string | null
+  onReview: (id: string, status: "approved" | "declined") => void
+}) {
   return (
     <Card className={cardClass}>
-      <PanelHeading icon={CreditCard} href="#" linkLabel="View All Transactions">
-        Recent Transactions
+      <PanelHeading icon={ClipboardCheck} href="/dashboard/admin/tuitions">
+        Tuition Approval Queue
+        <span className="ml-1 rounded-full bg-[#F5B849]/15 px-1.5 py-0.5 text-[10px] text-[#F5B849]">
+          {queue.length}
+        </span>
       </PanelHeading>
       <CardContent className="px-0 pb-1">
-        <Table className="text-[11px]">
-          <TableHeader>
-            <TableRow className="border-white/[0.06] hover:bg-transparent">
-              <TableHead className="h-9 w-8 pl-4 text-[10px] font-semibold text-gray-500">#</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">User</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Role</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Plan Name</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Amount</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Transaction ID</TableHead>
-              <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Payment Date</TableHead>
-              <TableHead className="h-9 pr-4 text-[10px] font-semibold text-gray-500">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {transactions.map((row) => (
-              <TableRow key={row.id} className="border-white/[0.05] hover:bg-white/[0.02]">
-                <TableCell className="pl-4 text-gray-500">{row.id}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Avatar size="sm" className="h-7 w-7">
-                      <AvatarFallback className="bg-white/[0.06] text-[9px] font-bold text-gray-300">
-                        {initials(row.user)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="leading-tight">
-                      <p className="font-semibold text-white">{row.user}</p>
-                      <p className="text-[9px] text-gray-500">{row.email}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={cn(
-                      "h-5 rounded-full px-2 text-[10px] font-bold hover:bg-transparent",
-                      row.role === "Student"
-                        ? "bg-[#B6F70B]/[0.12] text-[#B6F70B]"
-                        : "bg-[#F5B849]/[0.12] text-[#F5B849]"
-                    )}
-                  >
-                    {row.role}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-gray-300">{row.plan}</TableCell>
-                <TableCell className="font-semibold text-white">{row.amount}</TableCell>
-                <TableCell className="font-mono text-[10px] text-gray-400">{row.txnId}</TableCell>
-                <TableCell className="text-gray-400">{row.date}</TableCell>
-                <TableCell className="pr-4">
-                  <Badge className="h-5 gap-1 rounded-full bg-[#B6F70B]/[0.12] px-2 text-[10px] font-bold text-[#B6F70B] hover:bg-[#B6F70B]/[0.12]">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {row.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        {queue.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#B6F70B]/20 bg-[#B6F70B]/5">
+              <CheckCircle2 className="h-5 w-5 text-[#B6F70B]" />
+            </span>
+            <p className="mt-3 text-[12px] font-bold text-white">All caught up</p>
+            <p className="mt-1 text-[11px] text-gray-500">
+              No pending tuitions need review right now.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="text-[11px]">
+              <TableHeader>
+                <TableRow className="border-white/[0.06] hover:bg-transparent">
+                  <TableHead className="h-9 w-8 pl-4 text-[10px] font-semibold text-gray-500">#</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Tuition Title</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Tutor</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Subject / Class</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Submitted</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Status</TableHead>
+                  <TableHead className="h-9 pr-4 text-[10px] font-semibold text-gray-500">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {queue.map((row, index) => (
+                  <TableRow key={row.id} className="border-white/[0.05] hover:bg-white/[0.02]">
+                    <TableCell className="pl-4 text-gray-500">{index + 1}</TableCell>
+                    <TableCell className="font-semibold text-white">{row.title}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar size="sm" className="h-7 w-7">
+                          <AvatarFallback className="bg-[#B6F70B]/15 text-[9px] font-bold text-[#B6F70B]">
+                            {initials(row.tutorName || "Tutor")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="leading-tight">
+                          <p className="font-semibold text-white">
+                            {row.tutorName || "Unknown tutor"}
+                          </p>
+                          <p className="text-[9px] text-gray-500">{row.tutorEmail || "—"}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-400">
+                      {row.subject}
+                      <span className="block text-[9px] text-gray-600">
+                        {row.classLevel}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-gray-400">
+                      {formatDate(row.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status={row.status} />
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="xs"
+                          disabled={busyId === row.id}
+                          onClick={() => onReview(row.id, "approved")}
+                          className="h-6 gap-1 rounded-md bg-[#B6F70B]/[0.12] px-2 text-[10px] font-bold text-[#B6F70B] hover:bg-[#B6F70B]/20 disabled:opacity-40"
+                        >
+                          <Check className="h-3 w-3" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="xs"
+                          disabled={busyId === row.id}
+                          onClick={() => onReview(row.id, "declined")}
+                          className="h-6 gap-1 rounded-md bg-[#F43F5E]/10 px-2 text-[10px] font-bold text-[#FB7185] hover:bg-[#F43F5E]/20 disabled:opacity-40"
+                        >
+                          <X className="h-3 w-3" />
+                          Decline
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-/* ============================================================================
-   PLATFORM ACTIVITY
-   ========================================================================== */
+/** Replaces the old hardcoded transactions table with real tuition records. */
+function RecentTuitionActivity({ items }: { items: Tuition[] }) {
+  return (
+    <Card className={cardClass}>
+      <PanelHeading
+        icon={BookOpen}
+        href="/dashboard/admin/tuitions"
+        linkLabel="Browse Site"
+      >
+        Recent Tuition Activity
+      </PanelHeading>
+      <CardContent className="px-0 pb-1">
+        {items.length === 0 ? (
+          <p className="px-4 py-10 text-center text-[11px] text-gray-500">
+            No tuitions have been posted yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="text-[11px]">
+              <TableHeader>
+                <TableRow className="border-white/[0.06] hover:bg-transparent">
+                  <TableHead className="h-9 pl-4 text-[10px] font-semibold text-gray-500">Title</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Tutor</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Subject</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Fee</TableHead>
+                  <TableHead className="h-9 text-[10px] font-semibold text-gray-500">Submitted</TableHead>
+                  <TableHead className="h-9 pr-4 text-[10px] font-semibold text-gray-500">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((row) => (
+                  <TableRow key={row.id} className="border-white/[0.05] hover:bg-white/[0.02]">
+                    <TableCell className="pl-4 font-semibold text-white">{row.title}</TableCell>
+                    <TableCell className="text-gray-400">{row.tutorName || "—"}</TableCell>
+                    <TableCell className="text-gray-400">{row.subject}</TableCell>
+                    <TableCell className="font-semibold text-white">
+                      ${row.fee || "0"}
+                    </TableCell>
+                    <TableCell className="text-gray-400">{formatDate(row.createdAt)}</TableCell>
+                    <TableCell className="pr-4">
+                      <StatusPill status={row.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
-function PlatformActivity() {
+function PlatformActivity({ activities }: { activities: ActivityItem[] }) {
   return (
     <Card className={cardClass}>
       <PanelHeading icon={Zap}>Platform Activity</PanelHeading>
       <CardContent className="px-4 py-1.5">
-        <ul className="divide-y divide-white/[0.05]">
-          {activities.map((item) => {
-            const Icon = item.icon
-            return (
-              <li key={item.id} className="flex items-start gap-3 py-3 first:pt-2 last:pb-2">
-                <span
-                  className={cn(
-                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                    item.iconClass
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold text-white">{item.title}</p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-gray-500">{item.detail}</p>
-                </div>
-                <span className="shrink-0 pt-0.5 text-[9px] whitespace-nowrap text-gray-600">
-                  {item.time}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
+        {activities.length === 0 ? (
+          <p className="py-10 text-center text-[11px] text-gray-500">
+            No activity recorded yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/[0.05]">
+            {activities.map((item) => {
+              const approved = item.title.toLowerCase().includes("approved")
+              const declined = item.title.toLowerCase().includes("declined")
+              const Icon: LucideIcon = item.kind === "user"
+                ? UserPlus
+                : approved
+                  ? CheckCircle2
+                  : declined
+                    ? XCircle
+                    : BookOpen
+              const iconClass = item.kind === "user"
+                ? "bg-[#B6F70B]/12 text-[#B6F70B]"
+                : approved
+                  ? "bg-[#B6F70B]/12 text-[#B6F70B]"
+                  : declined
+                    ? "bg-rose-500/10 text-rose-300"
+                    : "bg-[#38BDF8]/12 text-[#38BDF8]"
+
+              return (
+                <li key={item.id} className="flex items-start gap-3 py-3 first:pt-2 last:pb-2">
+                  <span
+                    className={cn(
+                      "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                      iconClass
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold text-white">{item.title}</p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-gray-500">
+                      {item.detail}
+                    </p>
+                  </div>
+                  <span className="shrink-0 pt-0.5 text-[9px] whitespace-nowrap text-gray-600">
+                    {item.time}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-/* ============================================================================
-   USER ROLE DISTRIBUTION (donut chart)
-   ========================================================================== */
+function UserRoleDistribution({
+  slices,
+  total,
+}: {
+  slices: RoleSlice[]
+  total: number
+}) {
+  const radius = 52
+  const circumference = 2 * Math.PI * radius
+  const colors = ["#B6F70B", "#7DB52E", "#5B686B"]
+  const segments = slices.map((slice, index) => {
+    const fractionOf = (item: RoleSlice) =>
+      total === 0 ? 0 : item.count / total
+    const length = fractionOf(slice) * circumference
+    const start = slices
+      .slice(0, index)
+      .reduce((sum, item) => sum + fractionOf(item) * circumference, 0)
+    return {
+      ...slice,
+      color: colors[index % colors.length],
+      dash: `${length} ${circumference - length}`,
+      offset: -start,
+    }
+  })
 
-function UserRoleDistribution() {
   return (
     <Card className={cardClass}>
       <CardHeader className="flex flex-row items-center gap-2 border-b border-white/[0.06] px-4 py-3">
@@ -631,47 +540,46 @@ function UserRoleDistribution() {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex items-center gap-4 px-4 py-4">
-        {/* 🔌 DYNAMIC: donut percentage gulo roleDistribution API theke calculate kore draw korun. */}
         <div className="relative h-[124px] w-[124px] shrink-0">
           <svg viewBox="0 0 132 132" className="h-full w-full" aria-hidden="true">
             <g transform="rotate(-90 66 66)">
-              <circle cx="66" cy="66" r="52" fill="none" stroke="#253033" strokeWidth="13" />
-              <circle
-                cx="66"
-                cy="66"
-                r="52"
-                fill="none"
-                stroke="#B6F70B"
-                strokeWidth="13"
-                strokeDasharray="261.7 326.7"
-              />
-              <circle
-                cx="66"
-                cy="66"
-                r="52"
-                fill="none"
-                stroke="#7DB52E"
-                strokeWidth="13"
-                strokeDasharray="65 326.7"
-                strokeDashoffset="-261.7"
-              />
+              <circle cx="66" cy="66" r={radius} fill="none" stroke="#253033" strokeWidth="13" />
+              {segments.map((segment) => (
+                <circle
+                  key={segment.label}
+                  cx="66"
+                  cy="66"
+                  r={radius}
+                  fill="none"
+                  stroke={segment.color}
+                  strokeWidth="13"
+                  strokeDasharray={segment.dash}
+                  strokeDashoffset={segment.offset}
+                />
+              ))}
             </g>
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[19px] leading-none font-extrabold text-white">
-              {overviewStats.totalUsers.toLocaleString("en-US")}
+              {total.toLocaleString("en-US")}
             </span>
             <span className="mt-1 text-[10px] text-gray-500">Total Users</span>
           </div>
         </div>
 
         <ul className="min-w-0 flex-1 space-y-2.5">
-          {roleDistribution.map((item) => (
+          {slices.map((item) => (
             <li key={item.label} className="flex items-center gap-2">
               <span className={cn("h-2 w-2 shrink-0 rounded-full", item.dot)} />
-              <span className="min-w-0 flex-1 truncate text-[11px] text-gray-400">{item.label}</span>
-              <span className="text-[11px] font-bold text-white">{item.count}</span>
-              <span className="w-10 text-right text-[10px] text-gray-500">{item.percent}</span>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-gray-400">
+                {item.label}
+              </span>
+              <span className="text-[11px] font-bold text-white">
+                {item.count.toLocaleString("en-US")}
+              </span>
+              <span className="w-11 text-right text-[10px] text-gray-500">
+                {item.percent}
+              </span>
             </li>
           ))}
         </ul>
@@ -680,17 +588,93 @@ function UserRoleDistribution() {
   )
 }
 
-/* ============================================================================
-   PAGE
-   ========================================================================== */
+const EMPTY_OVERVIEW: AdminOverview = {
+  stats: {
+    totalUsers: 0,
+    students: 0,
+    tutors: 0,
+    admins: 0,
+    totalTuitions: 0,
+    pending: 0,
+    approved: 0,
+    declined: 0,
+  },
+  queue: [],
+  recentTuitions: [],
+  recentUsers: [],
+  roleDistribution: [],
+  activities: [],
+}
 
 export default function AdminDashboardPage() {
   const [query, setQuery] = React.useState("")
+  const [overview, setOverview] = React.useState<AdminOverview | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState(false)
+  const [busyId, setBusyId] = React.useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = React.useState(0)
+
+  const reload = () => {
+    setLoading(true)
+    setRefreshKey((key) => key + 1)
+  }
+
+  React.useEffect(() => {
+    let active = true
+
+    fetch("/api/admin/overview", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Failed to load admin overview")
+        return (await response.json()) as AdminOverview
+      })
+      .then((data) => {
+        if (!active) return
+        setOverview(data)
+        setError(false)
+      })
+      .catch((loadError) => {
+        console.error(loadError)
+        if (active) setError(true)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [refreshKey])
+
+  const handleReview = async (id: string, status: "approved" | "declined") => {
+    setBusyId(id)
+    try {
+      await updateTuitionStatus(id, status)
+      reload()
+    } catch (actionError) {
+      console.error(actionError)
+      window.alert(
+        actionError instanceof Error
+          ? actionError.message
+          : "Could not update the tuition."
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const data = overview ?? EMPTY_OVERVIEW
+  const queue = data.queue.filter((item) => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return true
+    return [item.title, item.tutorName, item.tutorEmail, item.subject]
+      .join(" ")
+      .toLowerCase()
+      .includes(needle)
+  })
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
       {/* ---------- TOP BAR ---------- */}
-      {/* 🔌 DYNAMIC: global search API. */}
       <div className="border-b border-white/[0.06] bg-[#0B1012] px-5 py-3 sm:px-7">
         <div className="mx-auto flex max-w-[1500px] items-center gap-3">
           <button
@@ -713,15 +697,21 @@ export default function AdminDashboardPage() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search users, tuitions, transactions..."
-                className="h-8 rounded-lg border-white/10 bg-[#141B1E] pr-12 pl-8 text-[11px] text-gray-300 placeholder:text-gray-600 focus-visible:border-[#B6F70B]/40 focus-visible:ring-[#B6F70B]/20"
+                placeholder="Search pending tuitions..."
+                className="h-8 rounded-lg border-white/10 bg-[#141B1E] pr-3 pl-8 text-[11px] text-gray-300 placeholder:text-gray-600 focus-visible:border-[#B6F70B]/40 focus-visible:ring-[#B6F70B]/20"
               />
-              <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] text-gray-500">
-                ⌘ K
-              </kbd>
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading}
+            title="Refresh data"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#141B1E] text-gray-400 transition-colors hover:border-[#B6F70B]/40 hover:text-[#B6F70B] disabled:opacity-50"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          </button>
         </div>
       </div>
 
@@ -735,41 +725,58 @@ export default function AdminDashboardPage() {
                 Platform Overview
               </h1>
               <p className="mt-1 text-[12px] text-gray-500">
-                Manage users, tuitions, approvals and payments across Tutors.
+                Manage users, tuitions, approvals and activity across Tutors —
+                live from the database.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* 🔌 DYNAMIC: date range state + backend query parameter ("from" & "to"). */}
             <Button
               variant="outline"
               className="h-9 gap-2 rounded-lg border-white/10 bg-[#141B1E] px-3 text-[11px] font-semibold text-gray-300 hover:bg-[#1A2327] hover:text-white"
             >
               <CalendarDays className="h-4 w-4 text-gray-400" />
-              Nov 1, 2026 – Nov 19, 2026
+              All time
               <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
             </Button>
-            {/* 🔌 DYNAMIC: Export Report = backend export API call (CSV/PDF download). */}
-            <Button className="h-9 gap-2 rounded-lg bg-[#B6F70B] px-3.5 text-[11px] font-extrabold text-[#0B1100] shadow-[0_4px_16px_rgba(182,247,11,0.15)] hover:bg-[#C9FF42]">
-              <Download className="h-4 w-4" />
-              Export Report
+            <Button
+              onClick={reload}
+              disabled={loading}
+              className="h-9 gap-2 rounded-lg bg-[#B6F70B] px-3.5 text-[11px] font-extrabold text-[#0B1100] shadow-[0_4px_16px_rgba(182,247,11,0.15)] hover:bg-[#C9FF42] disabled:opacity-60"
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              Refresh Data
             </Button>
           </div>
         </div>
 
+        {error && (
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-3 text-[11px] font-semibold text-rose-300">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Could not load dashboard data. Please try refreshing.
+          </div>
+        )}
+
         <div className="mt-5">
-          <StatCards />
+          <StatCards stats={data.stats} />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]">
           <div className="min-w-0 space-y-4">
-            <TuitionApprovalQueue />
-            <RecentTransactions />
+            <TuitionApprovalQueue
+              queue={queue}
+              busyId={busyId}
+              onReview={handleReview}
+            />
+            <RecentTuitionActivity items={data.recentTuitions} />
           </div>
           <div className="min-w-0 space-y-4">
-            <PlatformActivity />
-            <UserRoleDistribution />
+            <PlatformActivity activities={data.activities} />
+            <UserRoleDistribution
+              slices={data.roleDistribution}
+              total={data.stats.totalUsers}
+            />
           </div>
         </div>
       </div>

@@ -40,6 +40,16 @@ import { Toaster } from "@/components/ui/sonner"
 
 type UserRole = "student" | "tutor"
 
+/** Reads the post-login destination set by protected actions (e.g. booking a
+    tuition). Only same-site paths are accepted to avoid open redirects. */
+function getCallbackURL() {
+  if (typeof window === "undefined") return "/"
+  const value = new URLSearchParams(window.location.search).get("callbackURL")
+  return value && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/"
+}
+
 const features = [
   {
     icon: ShieldCheck,
@@ -76,6 +86,7 @@ export default function SignInPage() {
 
     const formData = new FormData(e.currentTarget)
     const email = String(formData.get("email") || "").trim()
+    const callbackURL = getCallbackURL()
 
     setIsLoading(true)
 
@@ -83,7 +94,7 @@ export default function SignInPage() {
       const { error } = await signIn.email({
         email,
         password,
-        callbackURL: "/",
+        callbackURL,
       })
 
       if (error) {
@@ -94,7 +105,7 @@ export default function SignInPage() {
 
       toast.success("Signed in successfully!")
 
-      router.push("/")
+      router.push(callbackURL)
     } catch {
       toast.error("Sign in failed. Try again.")
     } finally {
@@ -110,7 +121,7 @@ export default function SignInPage() {
     try {
       const { error } = await signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: getCallbackURL(),
       })
 
       if (error) {

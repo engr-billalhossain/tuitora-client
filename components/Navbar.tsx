@@ -254,7 +254,7 @@ export default function Navbar() {
             ) : (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:hidden">
                 <Link
-                  href="/login"
+                  href="/sign-in"
                   onClick={() => setMenuOpen(false)}
                   className="rounded-full border border-[#B6F70B] py-3 text-center text-sm font-semibold"
                 >
@@ -262,7 +262,7 @@ export default function Navbar() {
                 </Link>
 
                 <Link
-                  href="/signup"
+                  href="/sign-up"
                   onClick={() => setMenuOpen(false)}
                   className="rounded-full bg-[#B6F70B] py-3 text-center text-sm font-bold text-black"
                 >

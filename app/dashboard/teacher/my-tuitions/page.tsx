@@ -14,22 +14,18 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  XCircle,
   Video,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
-  getTuitions,
-  LOCAL_KEY,
-  TUITIONS_CHANGED_EVENT,
+  getBookings,
+  getMyTuitions,
+  type Booking,
   type Tuition,
 } from "@/lib/actions/postTuitions"
-
-function tuitionKey(tuition: Tuition) {
-  return `${tuition.title.trim().toLowerCase()}|${tuition.subject
-    .trim()
-    .toLowerCase()}`
-}
+import { getSlot, normalizeSlots } from "@/lib/slots"
 
 function formatDate(value?: string) {
   if (!value) return "—"
@@ -46,6 +42,7 @@ function formatDate(value?: string) {
 function StatusBadge({ status }: { status?: string }) {
   const normalized = (status || "pending").toLowerCase()
   const approved = normalized === "approved" || normalized === "published"
+  const declined = normalized === "declined" || normalized === "rejected"
 
   return (
     <span
@@ -53,21 +50,37 @@ function StatusBadge({ status }: { status?: string }) {
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold",
         approved
           ? "border-[#B6F70B]/30 bg-[#B6F70B]/10 text-[#B6F70B]"
-          : "border-amber-400/30 bg-amber-400/10 text-amber-300"
+          : declined
+            ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+            : "border-amber-400/30 bg-amber-400/10 text-amber-300"
       )}
     >
       {approved ? (
         <CheckCircle2 className="h-3 w-3" />
+      ) : declined ? (
+        <XCircle className="h-3 w-3" />
       ) : (
         <Clock3 className="h-3 w-3" />
       )}
-      {approved ? "Published" : "Pending review"}
+      {approved ? "Approved" : declined ? "Declined" : "Pending review"}
     </span>
   )
 }
 
-function TuitionCard({ tuition }: { tuition: Tuition }) {
+function TuitionCard({
+  tuition,
+  bookings,
+}: {
+  tuition: Tuition
+  bookings: Booking[]
+}) {
   const isOnline = tuition.mode.toLowerCase() === "online"
+  const bookedIds = new Set(
+    bookings
+      .filter((booking) => booking.tuitionId === tuition.id)
+      .map((booking) => booking.slotId)
+  )
+  const offeredSlots = normalizeSlots(tuition.slots)
 
   return (
     <article className="rounded-2xl border border-white/[0.07] bg-[#0D1417] p-5 shadow-[0_8px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[#B6F70B]/25">
@@ -80,6 +93,13 @@ function TuitionCard({ tuition }: { tuition: Tuition }) {
         </div>
         <StatusBadge status={tuition.status} />
       </div>
+
+      {tuition.status === "declined" && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[11px] leading-relaxed text-rose-300">
+          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          This tuition was declined by the admin and is not visible to students.
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="rounded-lg border border-white/10 bg-[#141C21] px-2.5 py-1 text-[11px] font-semibold text-gray-300">
@@ -105,6 +125,32 @@ function TuitionCard({ tuition }: { tuition: Tuition }) {
         </span>
       </div>
 
+      <div className="mt-4">
+        <p className="mb-1.5 text-[10px] font-bold text-gray-500">
+          Time slots ({offeredSlots.length})
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {offeredSlots.map((slotId) => {
+            const slot = getSlot(slotId)
+            const booked = bookedIds.has(slotId)
+            return (
+              <span
+                key={slotId}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold",
+                  booked
+                    ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                    : "border-[#B6F70B]/25 bg-[#B6F70B]/5 text-[#B6F70B]"
+                )}
+              >
+                {slot?.label ?? slotId} · {slot?.start}–{slot?.end}
+                {booked && " · Booked"}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+
       {tuition.description && (
         <p className="mt-4 line-clamp-3 text-[12px] leading-relaxed text-gray-400">
           {tuition.description}
@@ -113,8 +159,7 @@ function TuitionCard({ tuition }: { tuition: Tuition }) {
 
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/[0.06] pt-4 text-[11px] font-semibold text-gray-400">
         <span className="inline-flex items-center gap-1.5">
-          <DollarSign className="h-3.5 w-3.5 text-[#B6F70B]" />
-          ${tuition.fee || "0"} / month
+          <DollarSign className="h-3.5 w-3.5 text-[#B6F70B]" />${tuition.fee || "0"} / month
         </span>
         <span className="inline-flex items-center gap-1.5">
           <CalendarDays className="h-3.5 w-3.5 text-[#B6F70B]" />
@@ -129,63 +174,32 @@ function TuitionCard({ tuition }: { tuition: Tuition }) {
   )
 }
 
-/* Local tuitions live in localStorage. useSyncExternalStore keeps the UI in
-   sync without calling setState from an effect body. */
-function subscribeToLocalTuitions(onChange: () => void) {
-  window.addEventListener(TUITIONS_CHANGED_EVENT, onChange)
-  window.addEventListener("storage", onChange)
-  return () => {
-    window.removeEventListener(TUITIONS_CHANGED_EVENT, onChange)
-    window.removeEventListener("storage", onChange)
-  }
-}
-
-function getLocalSnapshot() {
-  if (typeof window === "undefined") return "[]"
-  return window.localStorage.getItem(LOCAL_KEY) || "[]"
-}
-
-function useLocalTuitions(): Tuition[] {
-  const snapshot = React.useSyncExternalStore(
-    subscribeToLocalTuitions,
-    getLocalSnapshot,
-    () => "[]"
-  )
-
-  return React.useMemo(() => {
-    try {
-      const parsed = JSON.parse(snapshot)
-      return Array.isArray(parsed) ? (parsed as Tuition[]) : []
-    } catch {
-      return []
-    }
-  }, [snapshot])
-}
-
 export default function MyTuitionsPage() {
-  const localTuitions = useLocalTuitions()
-  const [remoteTuitions, setRemoteTuitions] = React.useState<Tuition[]>([])
+  const [tuitions, setTuitions] = React.useState<Tuition[]>([])
+  const [bookings, setBookings] = React.useState<Booking[]>([])
   const [loading, setLoading] = React.useState(true)
-  const [backendError, setBackendError] = React.useState(false)
+  const [error, setError] = React.useState(false)
   const [refreshKey, setRefreshKey] = React.useState(0)
 
-  const refresh = React.useCallback(() => {
+  const handleRefresh = () => {
+    setLoading(true)
     setRefreshKey((key) => key + 1)
-  }, [])
+  }
 
   React.useEffect(() => {
     let active = true
 
-    getTuitions()
-      .then((remote) => {
+    Promise.all([getMyTuitions(), getBookings()])
+      .then(([items, allBookings]) => {
         if (!active) return
-        setRemoteTuitions(remote)
-        setBackendError(false)
+        setTuitions(items)
+        setBookings(allBookings)
+        setError(false)
       })
-      .catch((error) => {
+      .catch((loadError) => {
         if (!active) return
-        console.error("Failed to load tuitions:", error)
-        setBackendError(true)
+        console.error("Failed to load your tuitions:", loadError)
+        setError(true)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -195,19 +209,6 @@ export default function MyTuitionsPage() {
       active = false
     }
   }, [refreshKey])
-
-  const handleRefresh = () => {
-    setLoading(true)
-    refresh()
-  }
-
-  const tuitions = React.useMemo(() => {
-    const seen = new Set(localTuitions.map(tuitionKey))
-    return [
-      ...localTuitions,
-      ...remoteTuitions.filter((tuition) => !seen.has(tuitionKey(tuition))),
-    ]
-  }, [localTuitions, remoteTuitions])
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
@@ -248,10 +249,10 @@ export default function MyTuitionsPage() {
           </div>
         </div>
 
-        {backendError && (
+        {error && (
           <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-[11px] font-semibold text-amber-300">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            Could not reach the server. Showing tuitions saved in this browser.
+            Could not load your tuitions. Please try refreshing.
           </div>
         )}
 
@@ -291,7 +292,11 @@ export default function MyTuitionsPage() {
             </p>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               {tuitions.map((tuition) => (
-                <TuitionCard key={tuition.id} tuition={tuition} />
+                <TuitionCard
+                  key={tuition.id}
+                  tuition={tuition}
+                  bookings={bookings}
+                />
               ))}
             </div>
           </>
