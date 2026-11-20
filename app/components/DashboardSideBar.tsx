@@ -493,7 +493,12 @@ export function TeacherSidebar() {
           href="/dashboard/teacher/my-tuitions"
           active={pathname === "/dashboard/teacher/my-tuitions"}
         />
-        <NavItem icon={Users} label="Applicants" />
+        <NavItem
+          icon={Users}
+          label="Applicants"
+          href="/dashboard/teacher/applicants"
+          active={pathname === "/dashboard/teacher/applicants"}
+        />
         <NavItem icon={UserRound} label="Update Profile" />
       </nav>
 

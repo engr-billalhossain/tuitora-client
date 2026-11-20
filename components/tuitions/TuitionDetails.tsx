@@ -34,6 +34,13 @@ import {
   type BrowseTuition,
 } from "@/lib/tuitions";
 import { cn } from "@/lib/utils";
+import {
+  getMyBookings,
+  getMyReviews,
+  type BookingRecord,
+  type Review,
+} from "@/lib/reviews";
+import { ReviewForm } from "@/components/tuitions/ReviewForm";
 import { BookButton } from "@/components/tuitions/BookButton";
 import { CancelApplicationButton } from "@/components/tuitions/CancelApplicationButton";
 import { SubjectIconTile } from "@/components/tuitions/SubjectIcon";
@@ -73,6 +80,8 @@ export function TuitionDetails() {
   const [tuitions, setTuitions] = React.useState<BrowseTuition[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [favorite, setFavorite] = React.useState(false);
+  const [myBookings, setMyBookings] = React.useState<BookingRecord[]>([]);
+  const [myReviews, setMyReviews] = React.useState<Review[]>([]);
 
   const loadTuition = React.useCallback(() => {
     let active = true;
@@ -118,6 +127,23 @@ export function TuitionDetails() {
     };
   }, [tuitionId]);
 
+  // A student may review the tutor only after being added to the course.
+  React.useEffect(() => {
+    if (!session?.user?.id || !tuitionId) return;
+    let active = true;
+    Promise.all([getMyBookings(), getMyReviews()])
+      .then(([bookingList, reviewList]) => {
+        if (active) {
+          setMyBookings(bookingList);
+          setMyReviews(reviewList);
+        }
+      })
+      .catch((error) => console.error("Failed to load review data:", error));
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id, tuitionId]);
+
   if (loading) return <DetailSkeleton />;
 
   const tuition = tuitions.find((item) => item.id === tuitionId);
@@ -146,6 +172,15 @@ export function TuitionDetails() {
   }
 
   const isOnline = tuition.mode.toLowerCase() === "online";
+  const role = session?.user?.role;
+  const isStudent = !role || role === "student";
+  const isEnrolled = myBookings.some(
+    (booking) => booking.tuitionId === tuition.id && booking.status === "enrolled"
+  );
+  const alreadyReviewed = myReviews.some(
+    (review) =>
+      review.tuitionId === tuition.id || review.tutorName === tuition.tutorName
+  );
   const related = tuitions
     .filter(
       (item) =>
@@ -435,6 +470,35 @@ export function TuitionDetails() {
                 are not available yet.
               </p>
             </section>
+
+            {/* Review — only after the tutor adds this student to the course */}
+            {isStudent && isEnrolled && (
+              <section className="rounded-2xl border border-white/[0.07] bg-[#10191D] p-5 sm:p-6">
+                <h2 className="flex items-center gap-2 text-[15px] font-extrabold text-white">
+                  <Star className="h-4 w-4 text-[#B6F70B]" />
+                  Review {tuition.tutorName}
+                </h2>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  You joined this course. Share your experience with other students.
+                </p>
+                <div className="mt-4">
+                  {alreadyReviewed ? (
+                    <p className="flex items-center gap-2 rounded-xl border border-[#B6F70B]/25 bg-[#B6F70B]/5 px-4 py-3 text-[12px] font-semibold text-[#B6F70B]">
+                      <CheckCircle2 className="h-4 w-4" />
+                      You have already reviewed this tutor. Thank you!
+                    </p>
+                  ) : (
+                    <ReviewForm
+                      tuitionId={tuition.id}
+                      tutorName={tuition.tutorName}
+                      onReviewed={() => {
+                        getMyReviews().then(setMyReviews).catch(() => undefined);
+                      }}
+                    />
+                  )}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Booking sidebar */}

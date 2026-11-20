@@ -10,6 +10,7 @@ import {
   Clock3,
   DollarSign,
   FileText,
+  Star,
   UserRound,
 } from "lucide-react";
 
@@ -18,6 +19,14 @@ import {
   readApplications,
   type BookingApplication,
 } from "@/lib/tuitions";
+import { useSession } from "@/lib/auth-client";
+import {
+  getMyBookings,
+  getMyReviews,
+  type BookingRecord,
+  type Review,
+} from "@/lib/reviews";
+import { ReviewForm } from "@/components/tuitions/ReviewForm";
 
 function useApplications() {
   const [applications, setApplications] = React.useState<
@@ -51,6 +60,49 @@ function formatDate(value: string) {
 
 export default function StudentApplicationsPage() {
   const applications = useApplications();
+  const { data: session } = useSession();
+  const [bookings, setBookings] = React.useState<BookingRecord[]>([]);
+  const [reviews, setReviews] = React.useState<Review[]>([]);
+  const [reviewing, setReviewing] = React.useState<string | null>(null);
+
+  const loadReviewData = React.useCallback(() => {
+    Promise.all([getMyBookings(), getMyReviews()])
+      .then(([bookingList, reviewList]) => {
+        setBookings(bookingList);
+        setReviews(reviewList);
+      })
+      .catch((error) => console.error("Failed to load review data:", error));
+  }, []);
+
+  React.useEffect(() => {
+    if (!session?.user?.id) return;
+    loadReviewData();
+    const sync = () => loadReviewData();
+    window.addEventListener("focus", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("focus", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [session?.user?.id, loadReviewData]);
+
+  function bookingFor(application: BookingApplication) {
+    return bookings.find(
+      (booking) =>
+        booking.tuitionId === application.tuitionId &&
+        (!application.slotId ||
+          !booking.slotId ||
+          booking.slotId === application.slotId)
+    );
+  }
+
+  function hasReviewed(application: BookingApplication) {
+    return reviews.some(
+      (review) =>
+        review.tuitionId === application.tuitionId ||
+        review.tutorName === application.tutorName
+    );
+  }
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
@@ -104,10 +156,17 @@ export default function StudentApplicationsPage() {
                     <h2 className="text-[15px] font-extrabold text-white">
                       {application.tuitionTitle}
                     </h2>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Request sent
-                    </span>
+                    {bookingFor(application)?.status === "enrolled" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[#B6F70B]/30 bg-[#B6F70B]/10 px-2 py-0.5 text-[10px] font-bold text-[#B6F70B]">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Added to course
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                        <Clock3 className="h-3 w-3" />
+                        Awaiting tutor
+                      </span>
+                    )}
                   </div>
 
                   {application.slotLabel && (
@@ -131,6 +190,36 @@ export default function StudentApplicationsPage() {
                       {formatDate(application.createdAt)}
                     </span>
                   </div>
+
+                  {bookingFor(application)?.status === "enrolled" && (
+                    <div className="mt-4 border-t border-white/[0.06] pt-4">
+                      {hasReviewed(application) ? (
+                        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[#B6F70B]">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          You reviewed {application.tutorName}
+                        </p>
+                      ) : reviewing === application.id ? (
+                        <ReviewForm
+                          tuitionId={application.tuitionId}
+                          tutorName={application.tutorName}
+                          onReviewed={() => {
+                            setReviewing(null);
+                            loadReviewData();
+                          }}
+                          onCancel={() => setReviewing(null)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setReviewing(application.id)}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#B6F70B]/40 px-4 text-[11px] font-extrabold text-[#B6F70B] transition-colors hover:bg-[#B6F70B]/10"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                          Review {application.tutorName}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
