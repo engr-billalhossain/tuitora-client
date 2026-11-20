@@ -2,6 +2,10 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
+import {
+  FREE_TUITION_POST_LIMIT,
+  PLAN_LIMIT_REACHED,
+} from "@/lib/plan-limits";
 import { normalizeSlots } from "@/lib/slots";
 import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
 import { safeImageUrl } from "@/lib/utils";
@@ -11,6 +15,23 @@ export const dynamic = "force-dynamic";
 async function getSessionUser() {
   const session = await auth.api.getSession({ headers: await headers() });
   return session?.user ?? null;
+}
+
+/** Matches every tuition owned by a tutor, including legacy posts. */
+function tutorFilter(user: {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+}): { $or: Record<string, unknown>[] } {
+  const email = (user.email || "").toLowerCase();
+  const name = user.name || "";
+  const conditions: Record<string, unknown>[] = [{ tutorId: user.id }];
+  if (email) conditions.push({ tutorEmail: email });
+  if (name) {
+    // Legacy posts saved before tutor identity was tracked.
+    conditions.push({ tutorName: name, tutorId: { $exists: false } });
+  }
+  return { $or: conditions };
 }
 
 /** GET /api/tuitions?status=approved | ?status=pending | ?scope=mine */
@@ -28,15 +49,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const email = (user.email || "").toLowerCase();
-      const name = user.name || "";
-      const conditions: Record<string, unknown>[] = [{ tutorId: user.id }];
-      if (email) conditions.push({ tutorEmail: email });
-      if (name) {
-        // Legacy posts saved before tutor identity was tracked.
-        conditions.push({ tutorName: name, tutorId: { $exists: false } });
-      }
-      filter.$or = conditions;
+      filter.$or = tutorFilter(user).$or;
     } else {
       // Public access is restricted to approved posts. Any other status is
       // privileged data and only admins may request it.
@@ -72,6 +85,20 @@ export async function POST(request: Request) {
     const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "You must be signed in" }, { status: 401 });
+    }
+
+    // Free tutors may publish up to two tuitions. The check lives on the
+    // server so the limit cannot be skipped from the browser.
+    const collection = await getTuitionCollection();
+    const postCount = await collection.countDocuments(tutorFilter(user));
+    if (postCount >= FREE_TUITION_POST_LIMIT) {
+      return NextResponse.json(
+        {
+          error: `Free plan allows up to ${FREE_TUITION_POST_LIMIT} tuition posts. Upgrade to PRO to post unlimited tuitions.`,
+          code: PLAN_LIMIT_REACHED,
+        },
+        { status: 403 }
+      );
     }
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -113,7 +140,6 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    const collection = await getTuitionCollection();
     const result = await collection.insertOne(doc);
 
     return NextResponse.json(

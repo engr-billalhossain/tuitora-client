@@ -7,6 +7,8 @@
      declined  -> visible only to the tutor who posted it, with a declined label
    ========================================================================== */
 
+import { PLAN_LIMIT_REACHED, PlanLimitError } from "@/lib/plan-limits";
+
 export type TuitionStatus = "pending" | "approved" | "declined";
 
 export type Tuition = {
@@ -98,7 +100,15 @@ export const createTuition = async (data: TuitionInput): Promise<Tuition> => {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      code?: string;
+    };
+    if (payload.code === PLAN_LIMIT_REACHED) {
+      throw new PlanLimitError(
+        payload.error || "Free plan tuition limit reached"
+      );
+    }
     throw new Error(payload.error || "Failed to create tuition");
   }
   const payload = (await response.json()) as { tuition: Tuition };
@@ -124,7 +134,15 @@ export const createBooking = async (
     body: JSON.stringify({ tuitionId, slotId }),
   });
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      code?: string;
+    };
+    if (payload.code === PLAN_LIMIT_REACHED) {
+      throw new PlanLimitError(
+        payload.error || "Free plan application limit reached"
+      );
+    }
     throw new Error(payload.error || "This slot is no longer available");
   }
 };

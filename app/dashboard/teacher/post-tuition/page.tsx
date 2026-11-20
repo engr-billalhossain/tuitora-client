@@ -27,7 +27,14 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { createTuition } from "@/lib/actions/postTuitions"
+import {
+  createTuition,
+  getMyTuitions,
+} from "@/lib/actions/postTuitions"
+import {
+  FREE_TUITION_POST_LIMIT,
+  isPlanLimitError,
+} from "@/lib/plan-limits"
 import { uploadBanner } from "@/lib/actions/uploadImage"
 import { TUITION_SLOTS } from "@/lib/slots"
 
@@ -140,6 +147,24 @@ export default function PostTuitionPage() {
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState("")
 
+  // Tutors on the free plan cannot open the post form once they have two
+  // tuitions; send them to the pricing page to upgrade instead.
+  React.useEffect(() => {
+    let active = true
+    getMyTuitions()
+      .then((items) => {
+        if (active && items.length >= FREE_TUITION_POST_LIMIT) {
+          router.replace("/pricing")
+        }
+      })
+      .catch(() => {
+        // The API still enforces the limit when submitting the form.
+      })
+    return () => {
+      active = false
+    }
+  }, [router])
+
   const clearBanner = () => {
     if (fileInputRef.current) fileInputRef.current.value = ""
     setBannerName("")
@@ -208,6 +233,10 @@ export default function PostTuitionPage() {
       setSubmitted(true)
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (submitError) {
+      if (isPlanLimitError(submitError)) {
+        router.replace("/pricing")
+        return
+      }
       setError(
         submitError instanceof Error
           ? submitError.message

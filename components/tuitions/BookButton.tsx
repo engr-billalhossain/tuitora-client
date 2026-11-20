@@ -20,6 +20,11 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { createBooking } from "@/lib/actions/postTuitions";
 import {
+  FREE_APPLICATION_LIMIT,
+  isPlanLimitError,
+} from "@/lib/plan-limits";
+import { getMyBookings } from "@/lib/reviews";
+import {
   APPLICATIONS_CHANGED_EVENT,
   hasApplied,
   saveApplication,
@@ -83,7 +88,7 @@ export function BookButton({
     };
   }, [dialogOpen]);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (applied) {
       toast.info("You have already requested this tuition.");
       return;
@@ -109,6 +114,18 @@ export function BookButton({
       return;
     }
 
+    // Send free students straight to the pricing page once they hit the cap.
+    try {
+      const bookings = await getMyBookings();
+      if (bookings.length >= FREE_APPLICATION_LIMIT) {
+        toast.info("Free plan application limit reached — upgrade to PRO.");
+        router.push("/pricing");
+        return;
+      }
+    } catch {
+      // If the count cannot be loaded, the server still enforces the limit.
+    }
+
     setDialogOpen(true);
   };
 
@@ -131,6 +148,11 @@ export function BookButton({
       setDialogOpen(false);
       toast.success(`Booking confirmed for ${selectedSlot.label}!`);
     } catch (bookingError) {
+      if (isPlanLimitError(bookingError)) {
+        toast.info(bookingError.message);
+        router.push("/pricing");
+        return;
+      }
       toast.error(
         bookingError instanceof Error
           ? bookingError.message

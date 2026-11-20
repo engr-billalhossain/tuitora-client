@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import type { Tuition } from "@/lib/actions/postTuitions";
+import {
+  FREE_APPLICATION_LIMIT,
+  PLAN_LIMIT_REACHED,
+} from "@/lib/plan-limits";
 import { getDb, idFilter } from "@/lib/mongodb";
 import { isSlotId, normalizeSlots, slotLabel } from "@/lib/slots";
 import {
@@ -110,6 +114,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only students can book" }, { status: 403 });
     }
 
+    // Free students may apply to up to five tuitions. Enforced here so the
+    // limit holds even if the browser skips its own check.
+    const collection = await getBookingCollection();
+    const applicationCount = await collection.countDocuments({
+      studentId: user.id,
+    });
+    if (applicationCount >= FREE_APPLICATION_LIMIT) {
+      return NextResponse.json(
+        {
+          error: `Free plan allows up to ${FREE_APPLICATION_LIMIT} tuition applications. Upgrade to PRO to apply without limits.`,
+          code: PLAN_LIMIT_REACHED,
+        },
+        { status: 403 }
+      );
+    }
+
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const tuitionId = String(body.tuitionId ?? "").trim();
     const slotId = body.slotId;
@@ -120,7 +140,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const collection = await getBookingCollection();
     const alreadyBooked = await collection.findOne({ tuitionId, slotId });
     if (alreadyBooked) {
       return NextResponse.json(
