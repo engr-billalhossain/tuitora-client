@@ -67,7 +67,7 @@ const content: Record<
         "24/7 priority tutor support",
       ],
       cta: "Activate PRO Member",
-      ctaHref: "/sign-up",
+      ctaHref: "/checkout?plan=tutor",
     },
     matrix: [
       {
@@ -135,7 +135,7 @@ const content: Record<
         "24/7 priority student support",
       ],
       cta: "Activate PRO Member",
-      ctaHref: "/sign-up",
+      ctaHref: "/checkout?plan=student",
     },
     matrix: [
       {

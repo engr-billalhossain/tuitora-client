@@ -23,6 +23,7 @@ import {
   FREE_APPLICATION_LIMIT,
   isPlanLimitError,
 } from "@/lib/plan-limits";
+import { isProValue } from "@/lib/plans";
 import { getMyBookings } from "@/lib/reviews";
 import {
   APPLICATIONS_CHANGED_EVENT,
@@ -114,16 +115,19 @@ export function BookButton({
       return;
     }
 
-    // Send free students straight to the pricing page once they hit the cap.
-    try {
-      const bookings = await getMyBookings();
-      if (bookings.length >= FREE_APPLICATION_LIMIT) {
-        toast.info("Free plan application limit reached — upgrade to PRO.");
-        router.push("/pricing");
-        return;
+    // PRO students are unlimited. Free students go to pricing once they hit
+    // the cap; the server repeats this check so the browser cannot bypass it.
+    if (!isProValue(session.user.plan)) {
+      try {
+        const bookings = await getMyBookings();
+        if (bookings.length >= FREE_APPLICATION_LIMIT) {
+          toast.info("Free plan application limit reached — upgrade to PRO.");
+          router.push("/pricing");
+          return;
+        }
+      } catch {
+        // If the count cannot be loaded, the server still enforces the limit.
       }
-    } catch {
-      // If the count cannot be loaded, the server still enforces the limit.
     }
 
     setDialogOpen(true);

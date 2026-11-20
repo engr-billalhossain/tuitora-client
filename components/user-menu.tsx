@@ -6,12 +6,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { authClient } from "@/lib/auth-client"
+import { isProValue } from "@/lib/plans"
 
 import {
   Bell,
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Crown,
   GraduationCap,
   LogOut,
   Mail,
@@ -24,6 +26,7 @@ type MenuUser = {
   email?: string | null
   image?: string | null
   role?: string | null
+  plan?: string | null
 }
 
 const menuItems = [
@@ -133,6 +136,7 @@ export function UserMenu({ user }: { user: MenuUser }) {
   }
 
   const name = user.name?.trim() || "User"
+  const isPro = isProValue(user.plan)
   const roleLabel =
     user.role === "admin"
       ? "Administrator"
@@ -164,6 +168,12 @@ export function UserMenu({ user }: { user: MenuUser }) {
         <span className="max-w-[110px] truncate text-[13px] font-bold text-[#101418] dark:text-white">
           {name}
         </span>
+
+        {isPro && (
+          <span className="shrink-0 rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-[#B8860B] dark:text-[#E8C34A]">
+            PRO
+          </span>
+        )}
 
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-gray-500 transition-transform duration-200 ${
@@ -206,6 +216,17 @@ export function UserMenu({ user }: { user: MenuUser }) {
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#E7FA9E] px-3 py-1 text-[11px] font-bold text-[#3F5A00] dark:bg-[#B6F70B]/15 dark:text-[#B6F70B]">
                 <GraduationCap className="h-3.5 w-3.5" />
                 {roleLabel}
+              </span>
+
+              <span
+                className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-extrabold ${
+                  isPro
+                    ? "border border-[#C9A227]/40 bg-[#C9A227]/10 text-[#B8860B] dark:text-[#E8C34A]"
+                    : "border border-white/10 bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400"
+                }`}
+              >
+                <Crown className="h-3.5 w-3.5" />
+                {isPro ? "PRO MEMBER" : "FREE PLAN"}
               </span>
 
               <p className="mt-2.5 flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400">

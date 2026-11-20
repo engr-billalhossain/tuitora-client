@@ -17,6 +17,34 @@ export const auth = betterAuth({
         required: false,
         input: true,
       },
+      // Billing state is server-owned. `input: false` keeps these fields out
+      // of sign-up / update-user payloads so the browser cannot grant itself PRO.
+      plan: {
+        type: "string",
+        defaultValue: "free",
+        required: false,
+        input: false,
+      },
+      proPlan: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      proActivatedAt: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      stripeCustomerId: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      stripePaymentIntentId: {
+        type: "string",
+        required: false,
+        input: false,
+      },
     },
   },
   baseURL: process.env.BETTER_AUTH_URL, 

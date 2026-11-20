@@ -35,6 +35,8 @@ import {
   FREE_TUITION_POST_LIMIT,
   isPlanLimitError,
 } from "@/lib/plan-limits"
+import { isProValue } from "@/lib/plans"
+import { useSession } from "@/lib/auth-client"
 import { uploadBanner } from "@/lib/actions/uploadImage"
 import { TUITION_SLOTS } from "@/lib/slots"
 
@@ -128,6 +130,8 @@ function SelectField({
 export default function PostTuitionPage() {
   const router = useRouter()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const { data: session, isPending } = useSession()
+  const isPro = isProValue(session?.user?.plan)
 
   const [title, setTitle] = React.useState("")
   const [subject, setSubject] = React.useState("")
@@ -150,6 +154,7 @@ export default function PostTuitionPage() {
   // Tutors on the free plan cannot open the post form once they have two
   // tuitions; send them to the pricing page to upgrade instead.
   React.useEffect(() => {
+    if (isPending || isPro) return
     let active = true
     getMyTuitions()
       .then((items) => {
@@ -163,7 +168,7 @@ export default function PostTuitionPage() {
     return () => {
       active = false
     }
-  }, [router])
+  }, [router, isPending, isPro])
 
   const clearBanner = () => {
     if (fileInputRef.current) fileInputRef.current.value = ""

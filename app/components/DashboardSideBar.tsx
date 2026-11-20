@@ -6,6 +6,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { authClient, useSession } from "@/lib/auth-client"
+import { isProValue } from "@/lib/plans"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
@@ -16,6 +17,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   CreditCard,
+  Crown,
   FileText,
   GraduationCap,
   Landmark,
@@ -306,11 +308,13 @@ function UserPill({
   image,
   name,
   roleLabel,
+  pro = false,
   compact = false,
 }: {
   image?: string | null
   name: string
   roleLabel: string
+  pro?: boolean
   compact?: boolean
 }) {
   const collapsed = useCollapsed()
@@ -354,6 +358,11 @@ function UserPill({
               )}
             >
               {roleLabel}
+              {pro && (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 px-1.5 py-0.5 text-[9px] font-extrabold text-[#E8C34A]">
+                  <Crown className="h-2.5 w-2.5" /> PRO
+                </span>
+              )}
             </span>
           </span>
           {compact ? (
@@ -417,7 +426,12 @@ export function AdminSidebar() {
       <div className="shrink-0 space-y-3">
         <Separator className="bg-white/10" />
 
-        <UserPill image="/admin.png" name={name} roleLabel="Administrator" />
+        <UserPill
+          image="/admin.png"
+          name={name}
+          roleLabel="Administrator"
+          pro={isProValue(user?.plan)}
+        />
 
         <SignOutButton />
       </div>
@@ -437,7 +451,13 @@ export function StudentSidebar() {
 
   return (
     <SidebarShell brand={<Brand compact />} width="w-[200px] lg:w-[230px]">
-      <UserPill image={user?.image} name={name} roleLabel="Student" compact />
+      <UserPill
+        image={user?.image}
+        name={name}
+        roleLabel="Student"
+        pro={isProValue(user?.plan)}
+        compact
+      />
 
       <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto">
         <NavItem
@@ -476,7 +496,13 @@ export function TeacherSidebar() {
 
   return (
     <SidebarShell brand={<Brand compact />} width="w-[200px] lg:w-[230px]">
-      <UserPill image={user?.image} name={name} roleLabel="Tutor" compact />
+      <UserPill
+        image={user?.image}
+        name={name}
+        roleLabel="Tutor"
+        pro={isProValue(user?.plan)}
+        compact
+      />
 
       <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto">
         <NavItem

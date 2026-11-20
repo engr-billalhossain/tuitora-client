@@ -6,6 +6,7 @@ import {
   FREE_TUITION_POST_LIMIT,
   PLAN_LIMIT_REACHED,
 } from "@/lib/plan-limits";
+import { isUserPro } from "@/lib/pro";
 import { normalizeSlots } from "@/lib/slots";
 import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
 import { safeImageUrl } from "@/lib/utils";
@@ -87,18 +88,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You must be signed in" }, { status: 401 });
     }
 
-    // Free tutors may publish up to two tuitions. The check lives on the
-    // server so the limit cannot be skipped from the browser.
+    // Free tutors may publish up to two tuitions. PRO accounts are unlimited.
+    // The check lives on the server so the limit cannot be skipped from the
+    // browser, and the PRO flag is read from the database (never from a client
+    // supplied value).
     const collection = await getTuitionCollection();
-    const postCount = await collection.countDocuments(tutorFilter(user));
-    if (postCount >= FREE_TUITION_POST_LIMIT) {
-      return NextResponse.json(
-        {
-          error: `Free plan allows up to ${FREE_TUITION_POST_LIMIT} tuition posts. Upgrade to PRO to post unlimited tuitions.`,
-          code: PLAN_LIMIT_REACHED,
-        },
-        { status: 403 }
-      );
+    if (!(await isUserPro(user.id))) {
+      const postCount = await collection.countDocuments(tutorFilter(user));
+      if (postCount >= FREE_TUITION_POST_LIMIT) {
+        return NextResponse.json(
+          {
+            error: `Free plan allows up to ${FREE_TUITION_POST_LIMIT} tuition posts. Upgrade to PRO to post unlimited tuitions.`,
+            code: PLAN_LIMIT_REACHED,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
