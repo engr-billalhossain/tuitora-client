@@ -33,7 +33,7 @@ import {
   toggleFavorite,
   type BrowseTuition,
 } from "@/lib/tuitions";
-import { cn } from "@/lib/utils";
+import { bannerBackgroundStyle, cn } from "@/lib/utils";
 import {
   getMyBookings,
   getMyReviews,
@@ -225,7 +225,10 @@ export function TuitionDetails() {
           {/* Main content */}
           <div className="min-w-0 space-y-5">
             {/* Hero card */}
-            <article className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#141C21] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.25)] sm:p-6">
+            <article
+              style={bannerBackgroundStyle(tuition.bannerUrl)}
+              className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#141C21] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.25)] sm:p-6"
+            >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-3">
                   <SubjectIconTile

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { idFilter } from "@/lib/mongodb";
 import { normalizeSlots } from "@/lib/slots";
 import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
+import { safeImageUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export async function PATCH(
       "fee",
       "days",
       "bannerName",
+      "bannerUrl",
       "description",
     ] as const;
     const update: Record<string, unknown> = {
@@ -52,7 +54,8 @@ export async function PATCH(
     };
     for (const key of editable) {
       if (typeof body[key] === "string") {
-        update[key] = (body[key] as string).trim();
+        update[key] =
+          key === "bannerUrl" ? safeImageUrl(body[key]) : (body[key] as string).trim();
       }
     }
     if (body.slots !== undefined) {

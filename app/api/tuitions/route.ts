@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { normalizeSlots } from "@/lib/slots";
 import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
+import { safeImageUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
       fee: String(body.fee).trim(),
       days: String(body.days).trim(),
       bannerName: String(body.bannerName ?? "").trim(),
+      bannerUrl: safeImageUrl(body.bannerUrl),
       description: String(body.description).trim(),
       slots: normalizeSlots(body.slots),
       status: "pending",

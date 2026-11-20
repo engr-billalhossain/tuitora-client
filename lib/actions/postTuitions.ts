@@ -18,6 +18,8 @@ export type Tuition = {
   fee: string;
   days: string;
   bannerName: string;
+  /** Public URL of the banner uploaded to ImgBB; used as the card background. */
+  bannerUrl?: string;
   description: string;
   /** Daily time slots this tutor offers for this subject. */
   slots?: string[];
@@ -45,6 +47,7 @@ export type TuitionInput = {
   fee: string;
   days: string;
   bannerName: string;
+  bannerUrl?: string;
   description: string;
   slots: string[];
 };
@@ -164,6 +167,7 @@ export const updateTuition = async (
       | "fee"
       | "days"
       | "bannerName"
+      | "bannerUrl"
       | "description"
       | "slots"
     >

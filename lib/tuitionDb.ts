@@ -1,6 +1,7 @@
 import type { Tuition, TuitionStatus } from "@/lib/actions/postTuitions";
 import { getDb } from "@/lib/mongodb";
 import { normalizeSlots } from "@/lib/slots";
+import { safeImageUrl } from "@/lib/utils";
 
 /** Same collection the existing backend uses, so old posts stay visible. */
 export const TUITION_COLLECTION = "courses";
@@ -38,6 +39,7 @@ export function serializeTuition(doc: LooseDoc): Tuition {
     fee: asString(doc.fee),
     days: asString(doc.days),
     bannerName: asString(doc.bannerName),
+    bannerUrl: safeImageUrl(doc.bannerUrl) || undefined,
     description: asString(doc.description),
     slots: normalizeSlots(doc.slots),
     status: normalizeStatus(doc.status),

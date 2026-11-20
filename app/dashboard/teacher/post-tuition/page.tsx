@@ -15,17 +15,20 @@ import {
   DollarSign,
   GraduationCap,
   ImagePlus,
+  Loader2,
   MapPin,
   PenLine,
   Send,
   Upload,
   Users,
   Video,
+  X,
   type LucideIcon,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { createTuition } from "@/lib/actions/postTuitions"
+import { uploadBanner } from "@/lib/actions/uploadImage"
 import { TUITION_SLOTS } from "@/lib/slots"
 
 const TITLE_LIMIT = 100
@@ -126,6 +129,9 @@ export default function PostTuitionPage() {
   const [fee, setFee] = React.useState("")
   const [days, setDays] = React.useState("")
   const [bannerName, setBannerName] = React.useState("")
+  const [bannerUrl, setBannerUrl] = React.useState("")
+  const [uploading, setUploading] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState("")
   const [description, setDescription] = React.useState("")
   const [slots, setSlots] = React.useState<string[]>(
     () => TUITION_SLOTS.map((slot) => slot.id)
@@ -134,10 +140,49 @@ export default function PostTuitionPage() {
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState("")
 
+  const clearBanner = () => {
+    if (fileInputRef.current) fileInputRef.current.value = ""
+    setBannerName("")
+    setBannerUrl("")
+    setUploadError("")
+  }
+
+  const handleBannerChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      clearBanner()
+      return
+    }
+
+    setBannerName(file.name)
+    setBannerUrl("")
+    setUploadError("")
+    setUploading(true)
+    try {
+      const result = await uploadBanner(file)
+      setBannerUrl(result.url)
+    } catch (uploadFailure) {
+      clearBanner()
+      setUploadError(
+        uploadFailure instanceof Error
+          ? uploadFailure.message
+          : "Could not upload the image. Please try again."
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSubmitting(true)
     setError("")
+
+    if (uploading) {
+      setError("Please wait for the banner image to finish uploading.")
+      setSubmitting(false)
+      return
+    }
 
     if (slots.length === 0) {
       setError("Please select at least one available time slot.")
@@ -153,6 +198,7 @@ export default function PostTuitionPage() {
       fee,
       days,
       bannerName,
+      bannerUrl,
       description,
       slots,
     }
@@ -396,34 +442,68 @@ export default function PostTuitionPage() {
               <FieldLabel icon={ImagePlus}>Banner Image</FieldLabel>
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#10181C] px-4 py-3.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#B6F70B]/25 bg-[#B6F70B]/5">
-                    <ImagePlus className="h-4 w-4 text-[#B6F70B]" />
+                  <span
+                    className="flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#B6F70B]/25 bg-[#B6F70B]/5 bg-cover bg-center"
+                    style={
+                      bannerUrl
+                        ? { backgroundImage: `url(${JSON.stringify(bannerUrl)})` }
+                        : undefined
+                    }
+                  >
+                    {!bannerUrl && <ImagePlus className="h-4 w-4 text-[#B6F70B]" />}
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-semibold text-gray-300">
-                      {bannerName || "Upload Banner Image (JPG, PNG)"}
+                      {uploading
+                        ? "Uploading image..."
+                        : bannerName || "Upload Banner Image (JPG, PNG)"}
                     </p>
                     <p className="mt-0.5 text-[10px] text-gray-600">
-                      Recommended size: 1200 x 600 (16:9)
+                      {bannerUrl
+                        ? "Uploaded — this image becomes the tuition card background."
+                        : "Recommended size: 1200 x 600 (16:9). Max 32 MB."}
                     </p>
                   </div>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   className="hidden"
-                  onChange={(event) => setBannerName(event.target.files?.[0]?.name || "")}
+                  onChange={handleBannerChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-[#182127] px-3 text-[11px] font-semibold text-gray-300 transition-colors hover:border-[#B6F70B]/40 hover:text-white"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Choose File
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {(bannerName || bannerUrl) && (
+                    <button
+                      type="button"
+                      onClick={clearBanner}
+                      aria-label="Remove banner image"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-[#182127] text-gray-400 transition-colors hover:border-rose-400/40 hover:text-rose-300"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-[#182127] px-3 text-[11px] font-semibold text-gray-300 transition-colors hover:border-[#B6F70B]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                    {uploading ? "Uploading..." : "Choose File"}
+                  </button>
+                </div>
               </div>
+              {uploadError && (
+                <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-rose-300">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  {uploadError}
+                </p>
+              )}
             </div>
 
             {/* Description */}
@@ -458,11 +538,11 @@ export default function PostTuitionPage() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploading}
               className="flex h-10 items-center gap-2 rounded-lg bg-[#B6F70B] px-5 text-[12px] font-extrabold text-[#0B1100] shadow-[0_4px_18px_rgba(182,247,11,0.2)] transition-colors hover:bg-[#C9FF42] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Send className="h-3.5 w-3.5" />
-              {submitting ? "Submitting..." : "Post Tuition"}
+              {submitting ? "Submitting..." : uploading ? "Uploading image..." : "Post Tuition"}
             </button>
           </div>
         </form>

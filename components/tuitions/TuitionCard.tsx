@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { type BrowseTuition } from "@/lib/tuitions";
-import { cn } from "@/lib/utils";
+import { cn, safeImageUrl } from "@/lib/utils";
 import { BookButton } from "@/components/tuitions/BookButton";
 import { TutorAvatar } from "@/components/tuitions/TutorAvatar";
 
@@ -32,6 +32,7 @@ export function TuitionCard({
 }) {
   const isOnline = tuition.mode.toLowerCase() === "online";
   const firstSlot = tuition.availableSlots[0];
+  const bannerUrl = safeImageUrl(tuition.bannerUrl);
 
   return (
     <article
@@ -50,6 +51,16 @@ export function TuitionCard({
       />
 
       <div className="relative z-10">
+        {/* Banner image — only rendered when a tutor uploaded one */}
+        {bannerUrl && (
+          <div
+            role="img"
+            aria-label={`Banner image for ${tuition.title}`}
+            className="mb-4 aspect-[2/1] w-full rounded-2xl border border-white/10 bg-[#141C21] bg-cover bg-center"
+            style={{ backgroundImage: `url(${JSON.stringify(bannerUrl)})` }}
+          />
+        )}
+
         {/* Tutor row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

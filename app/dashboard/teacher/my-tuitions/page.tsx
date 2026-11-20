@@ -18,7 +18,7 @@ import {
   Video,
 } from "lucide-react"
 
-import { cn } from "@/lib/utils"
+import { bannerBackgroundStyle, cn } from "@/lib/utils"
 import {
   getBookings,
   getMyTuitions,
@@ -83,7 +83,10 @@ function TuitionCard({
   const offeredSlots = normalizeSlots(tuition.slots)
 
   return (
-    <article className="rounded-2xl border border-white/[0.07] bg-[#0D1417] p-5 shadow-[0_8px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[#B6F70B]/25">
+    <article
+      style={bannerBackgroundStyle(tuition.bannerUrl)}
+      className="rounded-2xl border border-white/[0.07] bg-[#0D1417] p-5 shadow-[0_8px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[#B6F70B]/25"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[15px] font-extrabold text-white">{tuition.title}</h2>

@@ -392,7 +392,12 @@ export function AdminSidebar() {
 
         <div className="space-y-1">
           <SectionLabel>Platform Management</SectionLabel>
-          <NavItem icon={UsersRound} label="Users & Roles" />
+          <NavItem
+            icon={UsersRound}
+            label="Users & Roles"
+            href="/dashboard/admin/users"
+            active={pathname === "/dashboard/admin/users"}
+          />
           <NavItem
             icon={ClipboardCheck}
             label="Tuition Approvals"
