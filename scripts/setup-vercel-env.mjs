@@ -74,7 +74,7 @@ const backendUrl = (backendUrlRaw ?? frontendUrlRaw).replace(/\/$/, "");
 values.BETTER_AUTH_URL = frontendUrl;
 values.NEXT_PUBLIC_BASE_URL = backendUrl;
 values.BACKEND_API_URL = backendUrl;
-if ("BASE_URL" in values) values.BASE_URL = backendUrl;
+if ("BASE_URL" in values) values.BASE_URL = frontendUrl;
 if (!values.JWT_SECRET) values.JWT_SECRET = values.BETTER_AUTH_SECRET;
 
 const targets = ["production", "preview", "development"];
