@@ -125,6 +125,9 @@ export default function SignInPage() {
       const { error } = await signIn.social({
         provider: "google",
         callbackURL: getCallbackURL(),
+        // A first-time Google sign-in creates the account here too, so pass the
+        // selected role through the OAuth state to the user-create hook.
+        additionalData: { role },
       })
 
       if (error) {

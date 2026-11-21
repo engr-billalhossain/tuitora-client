@@ -1,9 +1,31 @@
 import { betterAuth } from "better-auth";
+import { getOAuthState } from "better-auth/api";
 import { MongoClient } from "mongodb";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
 
 const client = new MongoClient(process.env.MONGODB_URI as string);
 const db = client.db("tuitoradb");
+
+/**
+ * Reads the role the visitor picked on the sign-up / sign-in page.
+ *
+ * Email signup sends `role` in the request body, but Google (and every other
+ * OAuth provider) only sends the provider profile, which has no role field.
+ * The auth pages pass the selection through `signIn.social`'s `additionalData`,
+ * which BetterAuth stores in the OAuth state and restores on the callback.
+ * `getOAuthState()` is request-scoped, so it is only available while an auth
+ * endpoint is running — hence the try/catch for non-OAuth flows.
+ */
+async function resolveSelectedRole(userRole: unknown): Promise<string> {
+  let oauthRole: unknown;
+  try {
+    const state = await getOAuthState<{ role?: unknown }>();
+    oauthRole = state?.role;
+  } catch {
+    // No OAuth request state (e.g. email signup) — fall back to the body field.
+  }
+  return String(oauthRole ?? userRole ?? "").toLowerCase();
+}
 
 /**
  * Fields the browser is never allowed to set through BetterAuth endpoints.
@@ -80,7 +102,7 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          const role = String(user.role ?? "").toLowerCase();
+          const role = await resolveSelectedRole(user.role);
           return {
             data: {
               ...user,

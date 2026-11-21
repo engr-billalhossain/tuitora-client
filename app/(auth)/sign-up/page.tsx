@@ -167,6 +167,10 @@ export default function SignUpPage() {
       const { error } = await signIn.social({
         provider: "google",
         callbackURL: "/",
+        // Google's profile has no role field. Carry the selected role through
+        // the OAuth state so the create hook stores a tutor instead of the
+        // default student account.
+        additionalData: { role },
       })
 
       if (error) {
