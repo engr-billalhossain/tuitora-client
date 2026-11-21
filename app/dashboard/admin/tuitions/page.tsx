@@ -26,6 +26,8 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { cn } from "@/lib/utils"
 import { getSlot, normalizeSlots } from "@/lib/slots"
 import { SubjectIconTile } from "@/components/tuitions/SubjectIcon"
@@ -515,11 +517,18 @@ export default function AdminTuitionsPage() {
     setBusyId(id)
     try {
       await updateTuitionStatus(id, status)
+      toast.success(
+        status === "approved"
+          ? "Tuition approved"
+          : status === "declined"
+            ? "Tuition declined"
+            : "Tuition returned to review"
+      )
       setDetail(null)
       reload()
     } catch (actionError) {
       console.error(actionError)
-      window.alert(
+      toast.error(
         actionError instanceof Error
           ? actionError.message
           : "Could not update this tuition."
@@ -533,12 +542,13 @@ export default function AdminTuitionsPage() {
     setBusyId(id)
     try {
       await updateTuition(id, patch)
+      toast.success("Tuition changes saved")
       setEditing(false)
       setDetail(null)
       reload()
     } catch (saveError) {
       console.error(saveError)
-      window.alert(
+      toast.error(
         saveError instanceof Error ? saveError.message : "Could not save changes."
       )
     } finally {

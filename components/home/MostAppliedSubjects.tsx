@@ -31,10 +31,20 @@ export function MostAppliedSubjects() {
           if (!subject) continue;
           counts.set(subject, (counts.get(subject) ?? 0) + 1);
         }
+        const ranked = Array.from(counts, ([subject, count]) => ({ subject, count }))
+          .sort((a, b) => b.count - a.count || a.subject.localeCompare(b.subject))
+          .slice(0, 6);
+
+        // Keep the popular categories visible even before the first application.
         setSubjects(
-          Array.from(counts, ([subject, count]) => ({ subject, count }))
-            .sort((a, b) => b.count - a.count || a.subject.localeCompare(b.subject))
-            .slice(0, 6)
+          ranked.length > 0
+            ? ranked
+            : [
+                { subject: "Mathematics", count: 0 },
+                { subject: "Physics", count: 0 },
+                { subject: "ICT / Programming", count: 0 },
+                { subject: "IELTS & Spoken English", count: 0 },
+              ]
         );
       })
       .catch((error) => console.error("Failed to load applied subjects:", error))

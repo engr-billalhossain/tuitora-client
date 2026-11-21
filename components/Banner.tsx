@@ -150,7 +150,7 @@ export default function Banner() {
 
             <Image
               src="/bannerr.png"
-              alt="Tuitora students and mentors"
+              alt="MentorLagbe students and mentors"
               width={800}
               height={560}
               priority

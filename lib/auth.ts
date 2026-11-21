@@ -5,15 +5,40 @@ import { mongodbAdapter } from "@better-auth/mongo-adapter";
 const client = new MongoClient(process.env.MONGODB_URI as string);
 const db = client.db("tuitoradb");
 
+/**
+ * Fields the browser is never allowed to set through BetterAuth endpoints.
+ * PRO activation and role changes go through verified server routes only.
+ */
+const SERVER_OWNED_FIELDS = [
+  "role",
+  "plan",
+  "proPlan",
+  "proActivatedAt",
+  "stripeCustomerId",
+  "stripePaymentIntentId",
+] as const;
+
 export const auth = betterAuth({
-    emailAndPassword: { 
-    enabled: true, 
-  }, 
+  emailAndPassword: {
+    enabled: true,
+  },
   user: {
     additionalFields: {
+      // A user may sign up as a student or a tutor. "admin" is intentionally
+      // NOT accepted here — it can only be granted via /api/admin/users.
       role: {
         type: "string",
         defaultValue: "student",
+        required: false,
+        input: true,
+      },
+      phone: {
+        type: "string",
+        required: false,
+        input: true,
+      },
+      bio: {
+        type: "string",
         required: false,
         input: true,
       },
@@ -47,14 +72,41 @@ export const auth = betterAuth({
       },
     },
   },
-  baseURL: process.env.BETTER_AUTH_URL, 
-    socialProviders: {
-        google: { 
-            clientId: process.env.GOOGLE_CLIENT_ID as string, 
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string, 
-        }, 
+  /**
+   * Defense in depth: even if a future endpoint forgets `input: false`, the
+   * database hook strips privileged fields and sanitises the role.
+   */
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const role = String(user.role ?? "").toLowerCase();
+          return {
+            data: {
+              ...user,
+              role: role === "tutor" || role === "teacher" ? "tutor" : "student",
+              plan: "free",
+            },
+          };
+        },
+      },
+      update: {
+        before: async (user) => {
+          const safe: Record<string, unknown> = { ...user };
+          for (const field of SERVER_OWNED_FIELDS) delete safe[field];
+          return { data: safe as Record<string, never> };
+        },
+      },
     },
-  
+  },
+  baseURL: process.env.BETTER_AUTH_URL,
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
+  },
+
   database: mongodbAdapter(db, {
     client,
   }),

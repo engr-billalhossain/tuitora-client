@@ -28,7 +28,10 @@ function serializeUser(user: LooseDoc) {
     name: asString(user.name) || "New user",
     email: asString(user.email),
     role: normalizeRole(user.role),
-    plan: asString(user.plan) || "FREE",
+    image: asString(user.image),
+    phone: asString(user.phone),
+    bio: asString(user.bio),
+    plan: asString(user.plan) || "free",
     createdAt: user.createdAt ? asString(user.createdAt) : undefined,
   };
 }

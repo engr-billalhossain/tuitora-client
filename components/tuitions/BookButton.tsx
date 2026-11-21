@@ -49,6 +49,9 @@ export function BookButton({
   const [confirming, setConfirming] = React.useState(false);
   const [applied, setApplied] = React.useState(false);
   const [slotId, setSlotId] = React.useState("");
+  const [note, setNote] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [preferredSchedule, setPreferredSchedule] = React.useState("");
 
   const availableSlots = React.useMemo(
     () => tuition.availableSlots ?? [],
@@ -135,9 +138,17 @@ export function BookButton({
 
   const handleConfirm = async () => {
     if (confirming || !selectedSlot) return;
+    if (phone.replace(/[^\d]/g, "").length < 7) {
+      toast.error("Please enter a valid phone number.");
+      return;
+    }
     setConfirming(true);
     try {
-      await createBooking(tuition.id, selectedSlot.id);
+      await createBooking(tuition.id, selectedSlot.id, {
+        studentNote: note,
+        studentPhone: phone,
+        preferredSchedule,
+      });
       saveApplication({
         tuitionId: tuition.id,
         slotId: selectedSlot.id,
@@ -287,6 +298,52 @@ export function BookButton({
                 })}
               </div>
             </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[11px] font-bold text-gray-300">
+                  Phone number <span className="text-red-500">*</span>
+                </span>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  maxLength={30}
+                  placeholder="+880 1XXX-XXXXXX"
+                  className="h-10 w-full rounded-xl border border-white/10 bg-[#141C21] px-3 text-[12px] text-white outline-none placeholder:text-gray-600 focus:border-[#B6F70B]/50"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] font-bold text-gray-300">
+                  Preferred schedule
+                </span>
+                <select
+                  value={preferredSchedule}
+                  onChange={(event) => setPreferredSchedule(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-white/10 bg-[#141C21] px-3 text-[12px] text-white outline-none focus:border-[#B6F70B]/50"
+                >
+                  <option value="">Same as selected slot</option>
+                  <option value="Weekday mornings">Weekday mornings</option>
+                  <option value="Weekday evenings">Weekday evenings</option>
+                  <option value="Weekend">Weekend</option>
+                  <option value="Flexible">Flexible</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="mt-5 block">
+              <span className="mb-2 block text-[11px] font-bold text-gray-300">
+                Learning note <span className="font-normal text-gray-500">(optional)</span>
+              </span>
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Tell the tutor about your learning goals..."
+                className="w-full resize-none rounded-xl border border-white/10 bg-[#141C21] p-3 text-[12px] text-white outline-none placeholder:text-gray-600 focus:border-[#B6F70B]/50"
+              />
+            </label>
 
             <div className="mt-5 flex gap-3">
               <button

@@ -18,10 +18,13 @@ import {
   Video,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { bannerBackgroundStyle, cn } from "@/lib/utils"
 import {
   getBookings,
   getMyTuitions,
+  updateMyTuition,
   type Booking,
   type Tuition,
 } from "@/lib/actions/postTuitions"
@@ -70,9 +73,11 @@ function StatusBadge({ status }: { status?: string }) {
 function TuitionCard({
   tuition,
   bookings,
+  onToggleActive,
 }: {
   tuition: Tuition
   bookings: Booking[]
+  onToggleActive?: (next: boolean) => void
 }) {
   const isOnline = tuition.mode.toLowerCase() === "online"
   const bookedIds = new Set(
@@ -94,7 +99,19 @@ function TuitionCard({
             Posted {formatDate(tuition.createdAt)}
           </p>
         </div>
-        <StatusBadge status={tuition.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-[10px] font-bold",
+              tuition.isActive
+                ? "border-sky-400/30 bg-sky-400/10 text-sky-300"
+                : "border-white/10 bg-white/5 text-gray-400"
+            )}
+          >
+            {tuition.isActive ? "Active" : "Paused"}
+          </span>
+          <StatusBadge status={tuition.status} />
+        </div>
       </div>
 
       {tuition.status === "declined" && (
@@ -173,6 +190,16 @@ function TuitionCard({
           {tuition.bannerName || "No banner"}
         </span>
       </div>
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onToggleActive?.(!tuition.isActive)}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-gray-300 transition-colors hover:border-[#B6F70B]/40 hover:text-white"
+        >
+          {tuition.isActive ? "Pause (hide from students)" : "Activate"}
+        </button>
+      </div>
     </article>
   )
 }
@@ -187,6 +214,20 @@ export default function MyTuitionsPage() {
   const handleRefresh = () => {
     setLoading(true)
     setRefreshKey((key) => key + 1)
+  }
+
+  async function handleToggleActive(tuition: Tuition, next: boolean) {
+    try {
+      await updateMyTuition(tuition.id, { isActive: next })
+      setTuitions((current) =>
+        current.map((item) =>
+          item.id === tuition.id ? { ...item, isActive: next } : item
+        )
+      )
+      toast.success(next ? "Tuition is now live" : "Tuition paused and hidden from students")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update tuition")
+    }
   }
 
   React.useEffect(() => {
@@ -299,6 +340,7 @@ export default function MyTuitionsPage() {
                   key={tuition.id}
                   tuition={tuition}
                   bookings={bookings}
+                  onToggleActive={(next) => handleToggleActive(tuition, next)}
                 />
               ))}
             </div>

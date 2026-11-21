@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { isProPlanValue, PRO_PURPOSE } from "@/lib/plans";
-import { activatePro } from "@/lib/pro";
+import { fulfillProPayment } from "@/lib/payments";
 import { stripe } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Stripe webhook: the authoritative source for granting PRO.
- * The RAW request body is used for signature verification — parsing JSON
- * first would break the HMAC and let forged events through.
+ * Stripe webhook: the authoritative source for granting PRO and recording a
+ * payment. The RAW request body is used for signature verification — parsing
+ * JSON first would break the HMAC and let forged events through.
  */
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -37,23 +37,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  if (event.type === "payment_intent.succeeded") {
-    const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    const metadata = paymentIntent.metadata ?? {};
-
-    // Only intents created by this app can activate PRO.
-    if (
-      metadata.purpose === PRO_PURPOSE &&
-      typeof metadata.userId === "string" &&
-      metadata.userId &&
-      isProPlanValue(metadata.plan)
-    ) {
-      await activatePro({
-        userId: metadata.userId,
-        plan: metadata.plan,
-        paymentIntentId: paymentIntent.id,
-      });
+  try {
+    if (event.type === "payment_intent.succeeded") {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const metadata = intent.metadata ?? {};
+      if (metadata.purpose === PRO_PURPOSE && intent.status === "succeeded") {
+        await fulfillProPayment({
+          userId: metadata.userId ?? "",
+          plan: metadata.plan,
+          transactionId: intent.id,
+          stripeSessionId: "",
+          amount: intent.amount,
+          currency: intent.currency,
+        });
+      }
     }
+
+    if (event.type === "checkout.session.completed") {
+      const checkoutSession = event.data
+        .object as Stripe.CheckoutSessionCompletedEvent["data"]["object"];
+      const metadata = checkoutSession.metadata ?? {};
+      if (
+        checkoutSession.mode === "payment" &&
+        checkoutSession.payment_status === "paid" &&
+        metadata.purpose === PRO_PURPOSE &&
+        isProPlanValue(metadata.plan)
+      ) {
+        // Use the PaymentIntent id as the transaction id so the
+        // payment_intent.succeeded event upserts the SAME payment row.
+        let transactionId =
+          typeof checkoutSession.payment_intent === "string"
+            ? checkoutSession.payment_intent
+            : checkoutSession.payment_intent?.id;
+        if (!transactionId) {
+          const refreshed = await stripe.checkout.sessions.retrieve(checkoutSession.id);
+          transactionId =
+            typeof refreshed.payment_intent === "string"
+              ? refreshed.payment_intent
+              : refreshed.payment_intent?.id ?? checkoutSession.id;
+        }
+
+        await fulfillProPayment({
+          userId: metadata.userId ?? checkoutSession.client_reference_id ?? "",
+          plan: metadata.plan,
+          transactionId,
+          stripeSessionId: checkoutSession.id,
+          amount: checkoutSession.amount_total ?? 0,
+          currency: checkoutSession.currency ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    // Returning 500 makes Stripe retry. The payment upsert is idempotent.
+    console.error("Failed to fulfill Stripe event:", error);
+    return NextResponse.json({ error: "Fulfillment failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

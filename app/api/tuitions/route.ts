@@ -8,8 +8,15 @@ import {
 } from "@/lib/plan-limits";
 import { isUserPro } from "@/lib/pro";
 import { normalizeSlots } from "@/lib/slots";
-import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
+import {
+  getBrowseFacets,
+  getTuitionCollection,
+  queryApprovedTuitions,
+  serializeTuition,
+  type BrowseQuery,
+} from "@/lib/tuitionDb";
 import { safeImageUrl } from "@/lib/utils";
+import { cleanText, isPositiveAmount, normalizeMode } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +42,70 @@ function tutorFilter(user: {
   return { $or: conditions };
 }
 
-/** GET /api/tuitions?status=approved | ?status=pending | ?scope=mine */
+function numberParam(value: string | null): number | undefined {
+  if (value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * GET /api/tuitions
+ * Public browse: ?status=approved&search=&subject=&classLevel=&mode=
+ *   &levels=ssc,hsc&modes=online&minFee=&maxFee=&days=&sort=&page=&limit=
+ * Privileged: ?status=pending|declined|all  |  ?scope=mine
+ */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope");
     const requestedStatus = searchParams.get("status");
+    const splitList = (key: string) =>
+      (searchParams.get(key) || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+    // Server-side search / filter / pagination for the public browse page.
+    // Legacy callers (getTuitions("approved")) still receive the same array.
+    if (!scope && (!requestedStatus || requestedStatus === "approved")) {
+      const query: BrowseQuery = {
+        search: searchParams.get("search") || searchParams.get("q") || "",
+        subject: searchParams.get("subject") || "",
+        classLevel: searchParams.get("classLevel") || searchParams.get("class") || "",
+        location: searchParams.get("location") || "",
+        modes: splitList("modes"),
+        levels: splitList("levels"),
+        minFee: numberParam(searchParams.get("minFee")),
+        maxFee: numberParam(searchParams.get("maxFee")),
+        days: searchParams.get("days") || "",
+        sort: searchParams.get("sort") || "newest",
+        page: numberParam(searchParams.get("page")) ?? 1,
+        limit: numberParam(searchParams.get("limit")) ?? 12,
+      };
+      const hasBrowseParams = [
+        "search",
+        "q",
+        "subject",
+        "classLevel",
+        "class",
+        "location",
+        "modes",
+        "levels",
+        "minFee",
+        "maxFee",
+        "days",
+        "page",
+        "limit",
+      ].some((key) => searchParams.has(key));
+
+      if (hasBrowseParams) {
+        const result = await queryApprovedTuitions(query);
+        return NextResponse.json({
+          ...result,
+          facets: await getBrowseFacets(),
+        });
+      }
+    }
 
     const filter: Record<string, unknown> = {};
 
@@ -56,6 +121,8 @@ export async function GET(request: Request) {
       // privileged data and only admins may request it.
       if (!requestedStatus || requestedStatus === "approved") {
         filter.status = "approved";
+        // Inactive posts are kept for the tutor/admin but hidden from students.
+        filter.isActive = { $ne: false };
       } else if (requestedStatus === "all") {
         const user = await getSessionUser();
         if (!user || (user as { role?: string }).role !== "admin") {
@@ -126,22 +193,47 @@ export async function POST(request: Request) {
       }
     }
 
+    const title = cleanText(body.title, 100);
+    const description = cleanText(body.description, 2000);
+    const fee = cleanText(body.fee, 20);
+    if (title.length < 3 || description.length < 10 || !isPositiveAmount(fee)) {
+      return NextResponse.json(
+        { error: "Provide a title, a description and a valid monthly fee" },
+        { status: 400 }
+      );
+    }
+
+    const mode = normalizeMode(body.mode);
+    const days = cleanText(body.days, 40);
+    const bannerUrl = safeImageUrl(body.bannerUrl);
+    const location = cleanText(body.location, 120);
+
+    // Canonical fields are written alongside legacy names so both old and new
+    // readers see a consistent document.
     const doc = {
-      title: String(body.title).trim(),
-      subject: String(body.subject).trim(),
-      classLevel: String(body.classLevel).trim(),
-      mode: String(body.mode).trim(),
-      fee: String(body.fee).trim(),
-      days: String(body.days).trim(),
-      bannerName: String(body.bannerName ?? "").trim(),
-      bannerUrl: safeImageUrl(body.bannerUrl),
-      description: String(body.description).trim(),
+      title,
+      subject: cleanText(body.subject, 80),
+      classLevel: cleanText(body.classLevel, 80),
+      mode,
+      fee,
+      monthlyFee: fee,
+      feeValue: Number.parseFloat(fee.replace(/[^0-9.]/g, "")) || 0,
+      days,
+      daysPerWeek: days,
+      daysValue: Number.parseInt(days, 10) || 0,
+      bannerName: cleanText(body.bannerName, 120),
+      bannerUrl,
+      bannerImage: bannerUrl,
+      location,
+      description,
       slots: normalizeSlots(body.slots),
       status: "pending",
+      approvalStatus: "pending",
+      isActive: true,
       tutorId: user.id,
       tutorEmail: (user.email || "").toLowerCase(),
       tutorName: user.name || "Tutor",
-      tutorImage: user.image || "",
+      tutorImage: safeImageUrl(user.image),
       createdAt: new Date().toISOString(),
     };
 

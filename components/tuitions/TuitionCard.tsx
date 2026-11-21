@@ -1,8 +1,10 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
+  Heart,
   BookOpen,
   CalendarDays,
   Clock3,
@@ -15,13 +17,47 @@ import {
   Video,
 } from "lucide-react";
 
-import { type BrowseTuition } from "@/lib/tuitions";
+import {
+  FAVORITES_CHANGED_EVENT,
+  readFavorites,
+  syncFavoritesFromServer,
+  toggleFavorite,
+  type BrowseTuition,
+} from "@/lib/tuitions";
 import { cn, safeImageUrl } from "@/lib/utils";
 import { BookButton } from "@/components/tuitions/BookButton";
 import { TutorAvatar } from "@/components/tuitions/TutorAvatar";
 
 const chipClass =
-  "inline-flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.035] px-2.5 py-1.5 text-[12px] font-semibold text-gray-300";
+  "inline-flex items-center gap-2 rounded-lg border border-[#0B1100]/10 dark:border-white/[0.07] bg-[#0B1100]/[0.03] dark:bg-white/[0.035] px-2.5 py-1.5 text-[12px] font-semibold text-[#424B50] dark:text-gray-300";
+
+function SaveButton({ tuitionId }: { tuitionId: string }) {
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(() => {
+    const sync = () => setSaved(readFavorites().includes(tuitionId));
+    sync();
+    void syncFavoritesFromServer().then(sync);
+    window.addEventListener(FAVORITES_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(FAVORITES_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [tuitionId]);
+
+  return (
+    <button
+      type="button"
+      aria-label={saved ? "Remove from saved tuitions" : "Save tuition"}
+      title={saved ? "Remove from saved tuitions" : "Save tuition"}
+      onClick={() => toggleFavorite(tuitionId)}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#0B1100]/10 dark:border-white/10 bg-white/[0.04] text-gray-400 transition-colors hover:border-[#B6F70B]/50 hover:text-[#B6F70B]"
+    >
+      <Heart className={cn("h-4 w-4", saved && "fill-[#B6F70B] text-[#B6F70B]")} />
+    </button>
+  );
+}
 
 export function TuitionCard({
   tuition,
@@ -37,7 +73,7 @@ export function TuitionCard({
   return (
     <article
       className={cn(
-        "group relative isolate overflow-hidden rounded-[20px] border border-white/[0.07] bg-[#0D1518] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] transition-colors duration-300 hover:border-[#F5B849]/30"
+        "group relative isolate overflow-hidden rounded-[20px] border border-[#0B1100]/10 dark:border-white/[0.07] bg-white dark:bg-[#0D1518] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] transition-colors duration-300 hover:border-[#F5B849]/30"
       )}
     >
       {/* Golden crescent accents in the top-right corner */}
@@ -56,7 +92,7 @@ export function TuitionCard({
           <div
             role="img"
             aria-label={`Banner image for ${tuition.title}`}
-            className="mb-4 aspect-[2/1] w-full rounded-2xl border border-white/10 bg-[#141C21] bg-cover bg-center"
+            className="mb-4 aspect-[2/1] w-full rounded-2xl border border-[#0B1100]/10 dark:border-white/10 bg-[#F7F9F5] dark:bg-[#141C21] bg-cover bg-center"
             style={{ backgroundImage: `url(${JSON.stringify(bannerUrl)})` }}
           />
         )}
@@ -71,7 +107,7 @@ export function TuitionCard({
             />
             <span aria-hidden className="h-10 w-px shrink-0 bg-white/10" />
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 truncate text-[17px] leading-tight font-extrabold text-white">
+              <p className="flex items-center gap-1.5 truncate text-[17px] leading-tight font-extrabold text-[#0B1100] dark:text-white">
                 {tuition.tutorName}
                 {tuition.verified && (
                   <BadgeCheck
@@ -99,6 +135,7 @@ export function TuitionCard({
               </p>
             </div>
           </div>
+          <SaveButton tuitionId={tuition.id} />
         </div>
 
         {/* Title */}
@@ -106,7 +143,7 @@ export function TuitionCard({
           <span aria-hidden className="mt-1.5 h-5 w-1 shrink-0 rounded-full bg-[#F5B849]" />
           <Link
             href={`/tuitions/${tuition.id}`}
-            className="line-clamp-2 text-[22px] leading-tight font-extrabold text-white transition-colors hover:text-[#F5B849]"
+            className="line-clamp-2 text-[22px] leading-tight font-extrabold text-[#0B1100] dark:text-white transition-colors hover:text-[#F5B849]"
           >
             {tuition.title}
           </Link>
@@ -165,12 +202,12 @@ export function TuitionCard({
 
         {/* Slot summary */}
         <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2 text-[13px] font-bold text-gray-300">
+          <span className="flex items-center gap-2 text-[13px] font-bold text-[#424B50] dark:text-gray-300">
             <UsersRound className="h-[18px] w-[18px] text-violet-400" />
             {tuition.availableSlots.length} slots open
           </span>
           <span aria-hidden className="h-5 w-px bg-white/10" />
-          <span className="flex items-center gap-2 text-[13px] font-bold text-white">
+          <span className="flex items-center gap-2 text-[13px] font-bold text-[#0B1100] dark:text-white">
             <Clock3 className="h-[18px] w-[18px] text-violet-400" />
             {firstSlot ? `${firstSlot.start} – ${firstSlot.end}` : "No slots"}
           </span>
@@ -180,7 +217,7 @@ export function TuitionCard({
         <div className="mt-3 flex gap-2.5">
           <Link
             href={`/tuitions/${tuition.id}`}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] text-[13px] font-bold text-gray-200 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#0B1100]/10 dark:border-white/10 bg-[#0B1100]/[0.03] dark:bg-white/[0.035] text-[13px] font-bold text-[#424B50] transition-colors hover:border-[#B6F70B]/40 hover:bg-[#0B1100]/[0.05] dark:text-gray-200 dark:hover:border-white/20 dark:hover:bg-white/[0.06] dark:hover:text-white"
           >
             <Eye className="h-[18px] w-[18px]" />
             View Details

@@ -30,6 +30,7 @@ import {
   getAllBrowseTuitions,
   matchesSubject,
   readFavorites,
+  syncFavoritesFromServer,
   toggleFavorite,
   type BrowseTuition,
 } from "@/lib/tuitions";
@@ -119,6 +120,8 @@ export function TuitionDetails() {
   React.useEffect(() => {
     const sync = () => setFavorite(readFavorites().includes(tuitionId));
     sync();
+    // Pull bookmarks saved on another device / another browser session.
+    void syncFavoritesFromServer().then(sync);
     window.addEventListener(FAVORITES_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
@@ -175,7 +178,7 @@ export function TuitionDetails() {
   const role = session?.user?.role;
   const isStudent = !role || role === "student";
   const isEnrolled = myBookings.some(
-    (booking) => booking.tuitionId === tuition.id && booking.status === "enrolled"
+    (booking) => booking.tuitionId === tuition.id && booking.status === "accepted"
   );
   const alreadyReviewed = myReviews.some(
     (review) =>
@@ -544,7 +547,23 @@ export function TuitionDetails() {
                 </ul>
 
                 <div className="mt-5">
-                  <BookButton tuition={tuition} variant="details" />
+                  {isStudent ? (
+                    <BookButton tuition={tuition} variant="details" />
+                  ) : (
+                    <div>
+                      <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-[11px] font-semibold text-amber-200">
+                        Only students can apply for a tuition. Switch to a student
+                        account to send an application.
+                      </p>
+                      <button
+                        type="button"
+                        disabled
+                        className="mt-3 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[12px] font-bold text-gray-500"
+                      >
+                        Apply Now (Students only)
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <p className="mt-3 text-center text-[10px] leading-relaxed text-gray-500">

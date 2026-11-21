@@ -4,15 +4,17 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
+import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
+import { clearAuthToken } from "@/lib/auth-token"
 import { isProValue } from "@/lib/plans"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 import {
-  BookOpen,
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
@@ -20,6 +22,9 @@ import {
   Crown,
   FileText,
   GraduationCap,
+  Heart,
+  Moon,
+  Sun,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -138,7 +143,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       />
       <div className="min-w-0">
         <p className="text-[19px] leading-none font-extrabold tracking-tight text-white">
-          TUITORA
+          MentorLagbe
         </p>
         {!compact && (
           <p className="mt-1 text-[10px] leading-none text-gray-500">
@@ -212,6 +217,32 @@ function NavItem({
   )
 }
 
+/** Shared dark / light switch — uses the same next-themes provider as the
+ *  public site, so the whole app follows one source of truth. */
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+  const collapsed = useCollapsed()
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
+  const isDark = mounted ? resolvedTheme === "dark" : true
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#151D22] text-gray-400 transition-colors hover:border-[#B6F70B]/40 hover:text-[#B6F70B]"
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      {!collapsed && <span className="sr-only">Toggle theme</span>}
+    </button>
+  )
+}
+
 function SignOutButton() {
   const router = useRouter()
   const collapsed = useCollapsed()
@@ -222,6 +253,8 @@ function SignOutButton() {
     setSigningOut(true)
     try {
       await authClient.signOut()
+      clearAuthToken()
+      toast.success("Signed out successfully")
       router.replace("/sign-in")
       router.refresh()
     } finally {
@@ -283,19 +316,22 @@ function SidebarShell({
         >
           {!collapsed && brand}
 
-          <button
-            type="button"
-            onClick={() => setUserCollapsed(!collapsed)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#151D22] text-gray-400 transition-colors hover:border-[#B6F70B]/40 hover:text-[#B6F70B]"
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setUserCollapsed(!collapsed)}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#151D22] text-gray-400 transition-colors hover:border-[#B6F70B]/40 hover:text-[#B6F70B]"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+          </div>
         </div>
 
         {children}
@@ -413,13 +449,31 @@ export function AdminSidebar() {
             href="/dashboard/admin/tuitions"
             active={pathname === "/dashboard/admin/tuitions"}
           />
-          <NavItem icon={CreditCard} label="Transactions" />
+          <NavItem
+            icon={CreditCard}
+            label="Transactions"
+            href="/dashboard/admin/transactions"
+            active={
+              pathname === "/dashboard/admin/transactions" ||
+              pathname === "/dashboard/admin/payments"
+            }
+          />
         </div>
 
         <div className="space-y-1">
           <SectionLabel>Account</SectionLabel>
-          <NavItem icon={UserRound} label="Profile" />
-          <NavItem icon={Settings} label="Settings" />
+          <NavItem
+            icon={UserRound}
+            label="Update Profile"
+            href="/dashboard/profile"
+            active={pathname === "/dashboard/profile" || pathname === "/profile"}
+          />
+          <NavItem
+            icon={Settings}
+            label="Settings"
+            href="/dashboard/profile"
+            active={pathname === "/dashboard/profile" || pathname === "/profile"}
+          />
         </div>
       </nav>
 
@@ -429,7 +483,7 @@ export function AdminSidebar() {
         <UserPill
           image="/admin.png"
           name={name}
-          roleLabel="Administrator"
+          roleLabel="Admin"
           pro={isProValue(user?.plan)}
         />
 
@@ -468,12 +522,26 @@ export function StudentSidebar() {
         />
         <NavItem icon={Search} label="Find Tuitions" href="/tuitions" />
         <NavItem
+          icon={Heart}
+          label="Saved Tuitions"
+          href="/dashboard/student/saved"
+          active={pathname === "/dashboard/student/saved"}
+        />
+        <NavItem
           icon={FileText}
           label="My Applications"
-          href="/dashboard/student/applications"
-          active={pathname === "/dashboard/student/applications"}
+          href="/dashboard/student/my-applications"
+          active={
+            pathname === "/dashboard/student/my-applications" ||
+            pathname === "/dashboard/student/applications"
+          }
         />
-        <NavItem icon={UserRound} label="My Profile" />
+        <NavItem
+          icon={UserRound}
+          label="Update Profile"
+          href="/dashboard/profile"
+          active={pathname === "/dashboard/profile" || pathname === "/profile"}
+        />
       </nav>
 
       <div className="shrink-0 space-y-3">
@@ -508,29 +576,44 @@ export function TeacherSidebar() {
         <NavItem
           icon={LayoutDashboard}
           label="Dashboard"
-          href="/dashboard/teacher"
-          active={pathname === "/dashboard/teacher"}
+          href="/dashboard/tutor"
+          active={
+            pathname === "/dashboard/tutor" || pathname === "/dashboard/teacher"
+          }
         />
-        <NavItem icon={BookOpen} label="Overview" />
         <NavItem
           icon={Plus}
           label="Post Tuition"
-          href="/dashboard/teacher/post-tuition"
-          active={pathname === "/dashboard/teacher/post-tuition"}
+          href="/dashboard/tutor/post-tuition"
+          active={
+            pathname === "/dashboard/tutor/post-tuition" ||
+            pathname === "/dashboard/teacher/post-tuition"
+          }
         />
         <NavItem
           icon={Landmark}
           label="My Tuitions"
-          href="/dashboard/teacher/my-tuitions"
-          active={pathname === "/dashboard/teacher/my-tuitions"}
+          href="/dashboard/tutor/my-tuitions"
+          active={
+            pathname === "/dashboard/tutor/my-tuitions" ||
+            pathname === "/dashboard/teacher/my-tuitions"
+          }
         />
         <NavItem
           icon={Users}
           label="Applicants"
-          href="/dashboard/teacher/applicants"
-          active={pathname === "/dashboard/teacher/applicants"}
+          href="/dashboard/tutor/applicants"
+          active={
+            pathname === "/dashboard/tutor/applicants" ||
+            pathname === "/dashboard/teacher/applicants"
+          }
         />
-        <NavItem icon={UserRound} label="Update Profile" />
+        <NavItem
+          icon={UserRound}
+          label="Update Profile"
+          href="/dashboard/profile"
+          active={pathname === "/dashboard/profile" || pathname === "/profile"}
+        />
       </nav>
 
       <div className="shrink-0 space-y-3">
@@ -565,7 +648,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       router.replace("/sign-in")
       return
     }
-    if (routeRole && routeRole !== role) {
+    // /dashboard/profile is shared by every role. "tutor" and "teacher" are
+    // aliases for the same dashboard role.
+    if (routeRole === "profile") return
+    const roleMatches =
+      routeRole === role || (role === "teacher" && routeRole === "tutor")
+    if (routeRole && !roleMatches) {
       router.replace(`/dashboard/${role}`)
     }
   }, [isPending, session?.user, routeRole, role, router])

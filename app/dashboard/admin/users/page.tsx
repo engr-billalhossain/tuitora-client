@@ -15,7 +15,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
-import { Toaster, toast } from "sonner"
+import { toast } from "sonner"
 
 /* ============================================================================
    Data comes from GET /api/admin/users (MongoDB). Roles are changed through
@@ -213,7 +213,6 @@ export default function AdminUsersPage() {
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
-      <Toaster theme="dark" position="top-right" />
 
       {/* ---------- TOP BAR ---------- */}
       <div className="border-b border-white/[0.06] bg-[#0B1012] px-5 py-3 sm:px-7">

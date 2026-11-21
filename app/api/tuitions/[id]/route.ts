@@ -6,6 +6,7 @@ import { idFilter } from "@/lib/mongodb";
 import { normalizeSlots } from "@/lib/slots";
 import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
 import { safeImageUrl } from "@/lib/utils";
+import { cleanText, normalizeApprovalStatus } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -46,20 +47,35 @@ export async function PATCH(
       "bannerName",
       "bannerUrl",
       "description",
+      "location",
     ] as const;
+    const approvalStatus = normalizeApprovalStatus(status);
     const update: Record<string, unknown> = {
-      status,
+      status: approvalStatus === "rejected" ? "declined" : approvalStatus,
+      approvalStatus,
       reviewedAt: new Date().toISOString(),
       reviewedBy: user.id,
     };
     for (const key of editable) {
       if (typeof body[key] === "string") {
         update[key] =
-          key === "bannerUrl" ? safeImageUrl(body[key]) : (body[key] as string).trim();
+          key === "bannerUrl" ? safeImageUrl(body[key]) : cleanText(body[key], 2000);
       }
     }
+    if (typeof update.fee === "string") {
+      update.monthlyFee = update.fee;
+      update.feeValue = Number.parseFloat(update.fee.replace(/[^0-9.]/g, "")) || 0;
+    }
+    if (typeof update.days === "string") {
+      update.daysPerWeek = update.days;
+      update.daysValue = Number.parseInt(update.days, 10) || 0;
+    }
+    if (typeof update.bannerUrl === "string") update.bannerImage = update.bannerUrl;
     if (body.slots !== undefined) {
       update.slots = normalizeSlots(body.slots);
+    }
+    if (typeof body.isActive === "boolean") {
+      update.isActive = body.isActive;
     }
 
     const collection = await getTuitionCollection();

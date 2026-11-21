@@ -4,15 +4,15 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 import { authClient } from "@/lib/auth-client"
+import { clearAuthToken } from "@/lib/auth-token"
 import { isProValue } from "@/lib/plans"
 
 import {
-  Bell,
   ChevronDown,
   ChevronRight,
-  CircleHelp,
   Crown,
   GraduationCap,
   LogOut,
@@ -29,11 +29,15 @@ type MenuUser = {
   plan?: string | null
 }
 
+function dashboardHref(role?: string | null) {
+  if (role === "admin") return "/dashboard/admin"
+  if (role === "tutor" || role === "teacher") return "/dashboard/tutor"
+  return "/dashboard/student"
+}
+
 const menuItems = [
-  { label: "My Profile", href: "/profile", icon: UserRound, active: true },
-  { label: "Account Settings", href: "/settings", icon: Settings },
-  { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Help & Support", href: "/help", icon: CircleHelp },
+  { label: "Dashboard", href: dashboardHref, icon: Settings },
+  { label: "Update Profile", href: () => "/dashboard/profile", icon: UserRound },
 ]
 
 function getInitials(name: string) {
@@ -127,6 +131,8 @@ export function UserMenu({ user }: { user: MenuUser }) {
 
     try {
       await authClient.signOut()
+      clearAuthToken()
+      toast.success("Signed out successfully")
       setOpen(false)
       router.push("/")
       router.refresh()
@@ -139,8 +145,8 @@ export function UserMenu({ user }: { user: MenuUser }) {
   const isPro = isProValue(user.plan)
   const roleLabel =
     user.role === "admin"
-      ? "Administrator"
-      : user.role === "tutor"
+      ? "Admin"
+      : user.role === "tutor" || user.role === "teacher"
         ? "Tutor"
         : "Student"
   const avatarSrc = user.role === "admin" ? "/admin.png" : user.image
@@ -167,6 +173,10 @@ export function UserMenu({ user }: { user: MenuUser }) {
 
         <span className="max-w-[110px] truncate text-[13px] font-bold text-[#101418] dark:text-white">
           {name}
+        </span>
+
+        <span className="hidden shrink-0 rounded-full bg-[#E7FA9E] px-2 py-0.5 text-[10px] font-bold text-[#3F5A00] sm:inline dark:bg-[#B6F70B]/15 dark:text-[#B6F70B]">
+          {roleLabel}
         </span>
 
         {isPro && (
@@ -241,18 +251,16 @@ export function UserMenu({ user }: { user: MenuUser }) {
             <div className="space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon
+                const href =
+                  typeof item.href === "function" ? item.href(user.role) : item.href
 
                 return (
                   <Link
                     key={item.label}
-                    href={item.href}
+                    href={href}
                     onClick={() => setOpen(false)}
                     role="menuitem"
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] transition-colors ${
-                      item.active
-                        ? "bg-[#E9F9B0] font-bold text-[#101418] dark:bg-[#B6F70B]/10 dark:text-white"
-                        : "font-semibold text-[#252B2D] hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5"
-                    }`}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-[#252B2D] transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5"
                   >
                     <Icon className="h-[18px] w-[18px] shrink-0 text-[#76B900] dark:text-[#B6F70B]" />
                     <span className="flex-1">{item.label}</span>

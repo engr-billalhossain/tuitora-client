@@ -17,8 +17,10 @@ import {
 import {
   APPLICATIONS_CHANGED_EVENT,
   readApplications,
+  removeApplication,
   type BookingApplication,
 } from "@/lib/tuitions";
+import { cancelBooking } from "@/lib/actions/postTuitions";
 import { useSession } from "@/lib/auth-client";
 import {
   getMyBookings,
@@ -27,6 +29,7 @@ import {
   type Review,
 } from "@/lib/reviews";
 import { ReviewForm } from "@/components/tuitions/ReviewForm";
+import { toast } from "sonner";
 
 function useApplications() {
   const [applications, setApplications] = React.useState<
@@ -56,6 +59,40 @@ function formatDate(value: string) {
         day: "numeric",
         year: "numeric",
       });
+}
+
+function CancelButton({ application }: { application: BookingApplication }) {
+  const [busy, setBusy] = React.useState(false);
+
+  const handleCancel = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (application.slotId) {
+        await cancelBooking(application.tuitionId, application.slotId);
+      }
+      removeApplication(application.tuitionId);
+      toast.success("Application cancelled");
+      window.dispatchEvent(new Event(APPLICATIONS_CHANGED_EVENT));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not cancel the application"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCancel}
+      disabled={busy}
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-400/30 px-3 text-[10px] font-bold text-rose-300 transition-colors hover:bg-rose-400/10 disabled:opacity-60"
+    >
+      {busy ? "Cancelling..." : "Cancel application"}
+    </button>
+  );
 }
 
 export default function StudentApplicationsPage() {
@@ -156,10 +193,14 @@ export default function StudentApplicationsPage() {
                     <h2 className="text-[15px] font-extrabold text-white">
                       {application.tuitionTitle}
                     </h2>
-                    {bookingFor(application)?.status === "enrolled" ? (
+                    {bookingFor(application)?.status === "accepted" ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#B6F70B]/30 bg-[#B6F70B]/10 px-2 py-0.5 text-[10px] font-bold text-[#B6F70B]">
                         <CheckCircle2 className="h-3 w-3" />
                         Added to course
+                      </span>
+                    ) : bookingFor(application)?.status === "rejected" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                        X Rejected
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
@@ -168,6 +209,13 @@ export default function StudentApplicationsPage() {
                       </span>
                     )}
                   </div>
+
+                  {!bookingFor(application) ||
+                  bookingFor(application)?.status === "pending" ? (
+                    <div className="mt-3">
+                      <CancelButton application={application} />
+                    </div>
+                  ) : null}
 
                   {application.slotLabel && (
                     <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#B6F70B]/25 bg-[#B6F70B]/[0.06] px-3 py-2 text-[11px] font-bold text-[#B6F70B]">
@@ -180,6 +228,11 @@ export default function StudentApplicationsPage() {
                     <span className="inline-flex items-center gap-1.5">
                       <UserRound className="h-3.5 w-3.5 text-[#B6F70B]" />
                       {application.tutorName}
+                      {bookingFor(application)?.tutorEmail && (
+                        <span className="text-gray-500">
+                          ({bookingFor(application)?.tutorEmail})
+                        </span>
+                      )}
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <DollarSign className="h-3.5 w-3.5 text-[#B6F70B]" />$
@@ -191,7 +244,7 @@ export default function StudentApplicationsPage() {
                     </span>
                   </div>
 
-                  {bookingFor(application)?.status === "enrolled" && (
+                  {bookingFor(application)?.status === "accepted" && (
                     <div className="mt-4 border-t border-white/[0.06] pt-4">
                       {hasReviewed(application) ? (
                         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[#B6F70B]">

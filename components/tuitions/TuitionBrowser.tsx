@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
-  AlertCircle,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -15,59 +15,41 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
-import { useSession } from "@/lib/auth-client";
 import {
   APPLICATIONS_CHANGED_EVENT,
   CLASS_LEVEL_OPTIONS,
   LOCATION_OPTIONS,
   SORT_OPTIONS,
   SUBJECT_OPTIONS,
-  daysValue,
   feeValue,
-  getBrowseData,
-  matchesClassLevel,
-  matchesSubject,
-  sortTuitions,
   type BrowseTuition,
 } from "@/lib/tuitions";
+import { browseHref, type BrowseFilterState } from "@/lib/browseFilters";
 import { cn } from "@/lib/utils";
+
+type Pagination = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  prev: number | null;
+  next: number | null;
+};
+type Facets = {
+  modes: { online: number; offline: number };
+  levels: Record<string, number>;
+};
 import { TuitionCard } from "@/components/tuitions/TuitionCard";
 
-const PAGE_SIZE = 12;
-
-/** Slider ceiling follows the actual listings, so high real fees stay visible. */
 function feeCeilingFor(list: BrowseTuition[]) {
-  const max = list.reduce((highest, item) => Math.max(highest, feeValue(item.fee)), 0);
+  const max = list.reduce(
+    (highest, item) => Math.max(highest, feeValue(item.fee)),
+    0
+  );
   return Math.max(300, Math.ceil(max / 100) * 100);
 }
-
-type Filters = {
-  query: string;
-  subject: string;
-  classLevel: string;
-  location: string;
-  modes: string[];
-  levels: string[];
-  minFee: number;
-  maxFee: number;
-  feeActive: boolean;
-  days: string;
-  sort: string;
-};
-
-const DEFAULT_FILTERS: Filters = {
-  query: "",
-  subject: "",
-  classLevel: "",
-  location: "",
-  modes: [],
-  levels: [],
-  minFee: 0,
-  maxFee: 300,
-  feeActive: false,
-  days: "",
-  sort: "newest",
-};
 
 const DAY_OPTIONS = [
   { value: "", label: "Any" },
@@ -77,14 +59,6 @@ const DAY_OPTIONS = [
   { value: "4", label: "4 Days" },
   { value: "5", label: "5 Days" },
 ];
-
-function normalizeClassParam(value: string) {
-  if (/^class-[678]$/.test(value)) return "class-6-8";
-  if (/^class-(9|10)$/.test(value)) return "ssc";
-  if (value === "class-11" || value === "class-12") return "hsc";
-  if (value === "admission") return "university";
-  return value;
-}
 
 function FilterSection({
   title,
@@ -96,11 +70,11 @@ function FilterSection({
   const [open, setOpen] = React.useState(true);
 
   return (
-    <div className="border-b border-white/[0.07] py-4 first:pt-0 last:border-0 last:pb-0">
+    <div className="border-b border-[#0B1100]/10 py-4 first:pt-0 last:border-0 last:pb-0 dark:border-white/[0.07]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between text-[12px] font-bold text-white"
+        className="flex w-full items-center justify-between text-[12px] font-bold text-[#0B1100] dark:text-white"
       >
         {title}
         <ChevronDown
@@ -127,7 +101,7 @@ function FilterCheckbox({
   onChange: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg py-0.5 text-[11px] font-semibold text-gray-300 transition-colors hover:text-white">
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg py-0.5 text-[11px] font-semibold text-[#424B50] transition-colors hover:text-[#0B1100] dark:text-gray-300 dark:hover:text-white">
       <input
         type="checkbox"
         checked={checked}
@@ -160,28 +134,20 @@ function Select({
   return (
     <div className="relative flex min-w-0 items-center">
       {Icon && (
-        <Icon className="pointer-events-none absolute left-3 h-4 w-4 shrink-0 text-[#B6F70B]" />
+        <Icon className="pointer-events-none absolute left-3 h-4 w-4 shrink-0 text-[#78B900]" />
       )}
       <select
         aria-label={ariaLabel}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          "h-10 w-full min-w-0 appearance-none rounded-xl border border-white/10 bg-[#141C21] pr-9 text-[11px] font-semibold text-gray-200 outline-none transition-colors focus:border-[#B6F70B]/50",
+          "h-10 w-full min-w-0 appearance-none rounded-xl border border-[#0B1100]/10 bg-white pr-9 text-[11px] font-semibold text-[#101418] outline-none transition-colors focus:border-[#B6F70B]/50 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-200",
           Icon ? "pl-9" : "pl-3"
         )}
       >
-        {placeholder && (
-          <option value="" className="bg-[#141C21]">
-            {placeholder}
-          </option>
-        )}
+        {placeholder && <option value="">{placeholder}</option>}
         {options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            className="bg-[#141C21] text-gray-200"
-          >
+          <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -195,81 +161,75 @@ export type TuitionBrowserProps = {
   initialQuery?: string;
   initialClass?: string;
   initialMode?: string;
+  initialFilters?: BrowseFilterState;
+  initialTuitions?: BrowseTuition[];
+  pagination?: Pagination;
+  facets?: Facets;
 };
 
-function buildInitialFilters({
-  initialQuery = "",
-  initialClass = "",
-  initialMode = "",
-}: TuitionBrowserProps): Filters {
-  return {
-    ...DEFAULT_FILTERS,
-    query: initialQuery,
-    classLevel: normalizeClassParam(initialClass),
-    modes:
-      initialMode === "online" || initialMode === "offline" ? [initialMode] : [],
-  };
-}
+const DEFAULT_FILTERS: BrowseFilterState = {
+  query: "",
+  subject: "",
+  classLevel: "",
+  location: "",
+  modes: [],
+  levels: [],
+  minFee: 0,
+  maxFee: 300,
+  feeActive: false,
+  days: "",
+  sort: "newest",
+};
 
-export function TuitionBrowser(initial: TuitionBrowserProps) {
-  const { data: session } = useSession();
+export function TuitionBrowser({
+  initialFilters,
+  initialTuitions = [],
+  pagination,
+  facets,
+}: TuitionBrowserProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = React.useTransition();
 
-  const [tuitions, setTuitions] = React.useState<BrowseTuition[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [backendReachable, setBackendReachable] = React.useState(true);
-  // Initial filters come from the home-page search form / navbar links.
-  const [draft, setDraft] = React.useState<Filters>(() =>
-    buildInitialFilters(initial)
-  );
-  const [applied, setApplied] = React.useState<Filters>(() =>
-    buildInitialFilters(initial)
+  // Filters come from the URL (parsed by the server page). Browsing is
+  // server-driven: changing any filter pushes a new URL and the server
+  // re-runs the MongoDB query with .skip()/.limit().
+  const [draft, setDraft] = React.useState<BrowseFilterState>(
+    () => initialFilters || DEFAULT_FILTERS
   );
   const [view, setView] = React.useState<"grid" | "list">("grid");
-  const [page, setPage] = React.useState(1);
 
-  const loadTuitions = React.useCallback(() => {
-    let active = true;
-    getBrowseData(session?.user?.name)
-      .then((result) => {
-        if (!active) return;
-        setTuitions(result.tuitions);
-        setBackendReachable(result.backendReachable);
-        const ceiling = feeCeilingFor(result.tuitions);
-        setDraft((previous) =>
-          previous.feeActive ? previous : { ...previous, maxFee: ceiling }
-        );
-        setApplied((previous) =>
-          previous.feeActive ? previous : { ...previous, maxFee: ceiling }
-        );
-      })
-      .catch((error) => {
-        console.error("Failed to load tuitions:", error);
-        if (active) setTuitions([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [session?.user?.name]);
+  const tuitions = initialTuitions;
+  const pageInfo = pagination || {
+    total: 0,
+    page: 1,
+    limit: 12,
+    totalPages: 1,
+    hasPrev: false,
+    hasNext: false,
+    prev: null,
+    next: null,
+  };
+  const feeCeiling = React.useMemo(() => feeCeilingFor(tuitions), [tuitions]);
 
-  React.useEffect(() => loadTuitions(), [loadTuitions]);
+  function navigate(next: BrowseFilterState, page = 1) {
+    startTransition(() => router.push(browseHref(next, page)));
+  }
 
-  // A booking anywhere removes that tuition from every student's listings.
+  // Booking/cancelling elsewhere should refresh the server-rendered listings.
   React.useEffect(() => {
-    const sync = () => loadTuitions();
+    const sync = () => router.refresh();
     window.addEventListener(APPLICATIONS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener(APPLICATIONS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
-  }, [loadTuitions]);
+  }, [router]);
 
-  const feeCeiling = React.useMemo(() => feeCeilingFor(tuitions), [tuitions]);
-
-  function updateDraft<K extends keyof Filters>(key: K, value: Filters[K]) {
+  function updateDraft<K extends keyof BrowseFilterState>(
+    key: K,
+    value: BrowseFilterState[K]
+  ) {
     setDraft((previous) => ({ ...previous, [key]: value }));
   }
 
@@ -278,117 +238,30 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
   }
 
   function applyFilters() {
-    setApplied({ ...draft });
-    setPage(1);
+    navigate(draft);
   }
 
   function resetFilters() {
     const reset = { ...DEFAULT_FILTERS, maxFee: feeCeiling };
     setDraft(reset);
-    setApplied(reset);
-    setPage(1);
+    navigate(reset);
   }
 
   function changeSort(value: string) {
     const next = { ...draft, sort: value };
     setDraft(next);
-    setApplied(next);
-    setPage(1);
+    navigate(next, pageInfo.page);
   }
 
-  const filtered = React.useMemo(() => {
-    const result = tuitions.filter((tuition) => {
-      const query = applied.query.trim().toLowerCase();
-      if (query) {
-        const haystack = [
-          tuition.title,
-          tuition.subject,
-          tuition.tutorName,
-          tuition.classLevel,
-          tuition.description,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (
-        applied.subject &&
-        !matchesSubject(tuition.subject, applied.subject)
-      ) {
-        return false;
-      }
-      if (
-        applied.classLevel &&
-        !matchesClassLevel(tuition.classLevel, applied.classLevel)
-      ) {
-        return false;
-      }
-      if (applied.location) {
-        if (applied.location === "Online") {
-          if (tuition.mode.toLowerCase() !== "online") return false;
-        } else if (
-          !tuition.location.toLowerCase().includes(applied.location.toLowerCase())
-        ) {
-          return false;
-        }
-      }
-      if (
-        applied.modes.length &&
-        !applied.modes.includes(tuition.mode.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        applied.levels.length &&
-        !applied.levels.some((level) =>
-          matchesClassLevel(tuition.classLevel, level)
-        )
-      ) {
-        return false;
-      }
-      if (applied.feeActive) {
-        const fee = feeValue(tuition.fee);
-        if (fee < applied.minFee || fee > applied.maxFee) return false;
-      }
-      if (
-        applied.days &&
-        daysValue(tuition.days) !== Number.parseInt(applied.days, 10)
-      ) {
-        return false;
-      }
-      return true;
-    });
-    return sortTuitions(result, applied.sort);
-  }, [tuitions, applied]);
+  function goToPage(page: number) {
+    if (page < 1 || page > pageInfo.totalPages || page === pageInfo.page) return;
+    startTransition(() => router.push(browseHref(draft, page)));
+  }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-  const firstItem = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const lastItem = Math.min(currentPage * PAGE_SIZE, filtered.length);
-
-  const counts = React.useMemo(
-    () => ({
-      online: tuitions.filter((item) => item.mode.toLowerCase() === "online")
-        .length,
-      offline: tuitions.filter((item) => item.mode.toLowerCase() === "offline")
-        .length,
-      "class-6-8": tuitions.filter((item) =>
-        matchesClassLevel(item.classLevel, "class-6-8")
-      ).length,
-      ssc: tuitions.filter((item) => matchesClassLevel(item.classLevel, "ssc"))
-        .length,
-      hsc: tuitions.filter((item) => matchesClassLevel(item.classLevel, "hsc"))
-        .length,
-      university: tuitions.filter((item) =>
-        matchesClassLevel(item.classLevel, "university")
-      ).length,
-    }),
-    [tuitions]
-  );
+  const counts = facets || {
+    modes: { online: 0, offline: 0 },
+    levels: {} as Record<string, number>,
+  };
 
   function toggleListValue(key: "modes" | "levels", value: string) {
     const current = draft[key];
@@ -401,11 +274,11 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
   }
 
   const subjectSelectOptions = SUBJECT_OPTIONS.map((value) => ({
-    value,
+    value: value === "All Subjects" ? "" : value,
     label: value,
   }));
   const locationSelectOptions = LOCATION_OPTIONS.map((value) => ({
-    value,
+    value: value === "All Locations" ? "" : value,
     label: value,
   }));
   const sortSelectOptions = SORT_OPTIONS.map((option) => ({
@@ -413,18 +286,22 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
     label: option.label,
   }));
 
+  const firstItem =
+    tuitions.length === 0 ? 0 : (pageInfo.page - 1) * pageInfo.limit + 1;
+  const lastItem = Math.min(pageInfo.page * pageInfo.limit, pageInfo.total);
+
   return (
-    <div className="min-h-screen bg-[#080D0F] pb-16 text-white">
+    <div className="min-h-screen bg-[#F3F7F1] pb-16 text-[#0B1100] transition-colors duration-300 dark:bg-[#080D0F] dark:text-white">
       <div className="mx-auto max-w-[1440px] px-4 pt-7 sm:px-8 lg:px-12">
         {/* Page heading */}
         <div className="mb-5">
-          <p className="text-[11px] font-bold tracking-[0.16em] text-[#B6F70B] uppercase">
+          <p className="text-[11px] font-bold tracking-[0.16em] text-[#78B900] uppercase dark:text-[#B6F70B]">
             Explore tuitions
           </p>
-          <h1 className="mt-1.5 text-[26px] leading-tight font-extrabold tracking-tight text-white sm:text-[30px]">
+          <h1 className="mt-1.5 text-[26px] leading-tight font-extrabold tracking-tight sm:text-[30px]">
             Find a tuition that fits you
           </h1>
-          <p className="mt-1.5 text-[12px] text-gray-400">
+          <p className="mt-1.5 text-[12px] text-[#5A666B] dark:text-gray-400">
             Browse all posted tuitions, compare details and request a booking
             in a few clicks.
           </p>
@@ -436,18 +313,18 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
             event.preventDefault();
             applyFilters();
           }}
-          className="rounded-2xl border border-white/[0.07] bg-[#10191D] p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.22)] sm:p-3"
+          className="rounded-2xl border border-[#0B1100]/10 bg-white p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] sm:p-3 dark:border-white/[0.07] dark:bg-[#10191D] dark:shadow-[0_8px_32px_rgba(0,0,0,0.22)]"
         >
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
             <div className="relative flex items-center">
-              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-[#B6F70B]" />
+              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-[#78B900] dark:text-[#B6F70B]" />
               <input
                 type="search"
                 value={draft.query}
                 onChange={(event) => updateDraft("query", event.target.value)}
                 placeholder="Search by subject, class, location or tutor name..."
                 aria-label="Search tuitions"
-                className="h-10 w-full rounded-xl border border-white/10 bg-[#141C21] pr-3 pl-9 text-[11px] text-gray-200 outline-none transition-colors placeholder:text-gray-500 focus:border-[#B6F70B]/50"
+                className="h-10 w-full rounded-xl border border-[#0B1100]/10 bg-[#F7F9F5] pr-3 pl-9 text-[11px] text-[#101418] outline-none transition-colors placeholder:text-gray-500 focus:border-[#B6F70B]/50 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-200"
               />
             </div>
             <Select
@@ -481,27 +358,19 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
           </div>
         </form>
 
-        {!loading && !backendReachable && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-[11px] font-semibold text-amber-300">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            Could not reach the server. Showing only tuitions saved in this
-            browser.
-          </div>
-        )}
-
         {/* Filters + results */}
         <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
           {/* Sidebar */}
-          <aside className="rounded-2xl border border-white/[0.07] bg-[#10191D] p-4 shadow-[0_8px_32px_rgba(0,0,0,0.2)] lg:sticky lg:top-[86px]">
+          <aside className="rounded-2xl border border-[#0B1100]/10 bg-white p-4 shadow-[0_8px_32px_rgba(0,0,0,0.03)] lg:sticky lg:top-[86px] dark:border-white/[0.07] dark:bg-[#10191D] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
             <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-[13px] font-extrabold text-white">
-                <SlidersHorizontal className="h-4 w-4 text-[#B6F70B]" />
+              <h2 className="flex items-center gap-2 text-[13px] font-extrabold">
+                <SlidersHorizontal className="h-4 w-4 text-[#78B900] dark:text-[#B6F70B]" />
                 Filters
               </h2>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="text-[11px] font-bold text-[#B6F70B] transition-colors hover:text-[#C9FF42]"
+                className="text-[11px] font-bold text-[#78B900] transition-colors hover:text-[#C9FF42] dark:text-[#B6F70B]"
               >
                 Reset
               </button>
@@ -511,13 +380,13 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
               <FilterSection title="Tuition Mode">
                 <FilterCheckbox
                   label="Online (Zoom / Meet)"
-                  count={counts.online}
+                  count={counts.modes.online}
                   checked={draft.modes.includes("online")}
                   onChange={() => toggleListValue("modes", "online")}
                 />
                 <FilterCheckbox
                   label="Offline (In-Person)"
-                  count={counts.offline}
+                  count={counts.modes.offline}
                   checked={draft.modes.includes("offline")}
                   onChange={() => toggleListValue("modes", "offline")}
                 />
@@ -529,7 +398,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                     <FilterCheckbox
                       key={option.value}
                       label={option.label}
-                      count={counts[option.value as keyof typeof counts]}
+                      count={counts.levels[option.value]}
                       checked={draft.levels.includes(option.value)}
                       onChange={() => toggleListValue("levels", option.value)}
                     />
@@ -577,7 +446,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                   />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-lg border border-white/10 bg-[#141C21] px-2.5">
+                  <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-lg border border-[#0B1100]/10 bg-[#F7F9F5] px-2.5 dark:border-white/10 dark:bg-[#141C21]">
                     <span className="text-[11px] text-gray-500">$</span>
                     <input
                       type="number"
@@ -591,11 +460,11 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                         )
                       }
                       aria-label="Minimum fee"
-                      className="w-full min-w-0 bg-transparent text-[11px] font-semibold text-gray-200 outline-none"
+                      className="w-full min-w-0 bg-transparent text-[11px] font-semibold outline-none"
                     />
                   </div>
                   <span className="text-gray-600">–</span>
-                  <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-lg border border-white/10 bg-[#141C21] px-2.5">
+                  <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-lg border border-[#0B1100]/10 bg-[#F7F9F5] px-2.5 dark:border-white/10 dark:bg-[#141C21]">
                     <span className="text-[11px] text-gray-500">$</span>
                     <input
                       type="number"
@@ -609,7 +478,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                         )
                       }
                       aria-label="Maximum fee"
-                      className="w-full min-w-0 bg-transparent text-[11px] font-semibold text-gray-200 outline-none"
+                      className="w-full min-w-0 bg-transparent text-[11px] font-semibold outline-none"
                     />
                   </div>
                 </div>
@@ -622,14 +491,10 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                     aria-label="Filter by days per week"
                     value={draft.days}
                     onChange={(event) => updateDraft("days", event.target.value)}
-                    className="h-9 w-full appearance-none rounded-lg border border-white/10 bg-[#141C21] pr-8 pl-8 text-[11px] font-semibold text-gray-300 outline-none focus:border-[#B6F70B]/50"
+                    className="h-9 w-full appearance-none rounded-lg border border-[#0B1100]/10 bg-[#F7F9F5] pr-8 pl-8 text-[11px] font-semibold outline-none focus:border-[#B6F70B]/50 dark:border-white/10 dark:bg-[#141C21]"
                   >
                     {DAY_OPTIONS.map((option) => (
-                      <option
-                        key={option.value}
-                        value={option.value}
-                        className="bg-[#141C21]"
-                      >
+                      <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
@@ -663,8 +528,8 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                         className={cn(
                           "rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",
                           active
-                            ? "border-[#B6F70B]/50 bg-[#B6F70B]/10 text-[#B6F70B]"
-                            : "border-white/10 bg-[#141C21] text-gray-400 hover:text-white"
+                            ? "border-[#B6F70B]/50 bg-[#B6F70B]/10 text-[#78B900] dark:text-[#B6F70B]"
+                            : "border-[#0B1100]/10 bg-[#F7F9F5] text-[#5A666B] hover:text-[#0B1100] dark:border-white/10 dark:bg-[#141C21] dark:text-gray-400 dark:hover:text-white"
                         )}
                       >
                         {chip.label}
@@ -688,15 +553,20 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
           {/* Results */}
           <section className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold text-gray-400">
-                {loading ? (
-                  "Loading tuitions..."
+              <p
+                className={cn(
+                  "text-[11px] font-semibold text-[#5A666B] dark:text-gray-400",
+                  isPending && "opacity-60"
+                )}
+              >
+                {isPending ? (
+                  "Searching the server..."
                 ) : (
                   <>
                     Showing{" "}
-                    <span className="font-bold text-white">{firstItem}</span> –{" "}
-                    <span className="font-bold text-white">{lastItem}</span> of{" "}
-                    <span className="font-bold text-white">{filtered.length}</span>{" "}
+                    <span className="font-bold">{firstItem}</span> –{" "}
+                    <span className="font-bold">{lastItem}</span> of{" "}
+                    <span className="font-bold">{pageInfo.total}</span>{" "}
                     Tuitions
                   </>
                 )}
@@ -710,21 +580,17 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                     aria-label="Sort tuitions"
                     value={draft.sort}
                     onChange={(event) => changeSort(event.target.value)}
-                    className="h-9 appearance-none rounded-lg border border-white/10 bg-[#141C21] pr-8 pl-3 text-[11px] font-semibold text-gray-200 outline-none focus:border-[#B6F70B]/50"
+                    className="h-9 appearance-none rounded-lg border border-[#0B1100]/10 bg-white pr-8 pl-3 text-[11px] font-semibold outline-none focus:border-[#B6F70B]/50 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-200"
                   >
                     {sortSelectOptions.map((option) => (
-                      <option
-                        key={option.value}
-                        value={option.value}
-                        className="bg-[#141C21]"
-                      >
+                      <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </select>
                   <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
                 </div>
-                <div className="flex items-center rounded-lg border border-white/10 bg-[#141C21] p-0.5">
+                <div className="flex items-center rounded-lg border border-[#0B1100]/10 bg-white p-0.5 dark:border-white/10 dark:bg-[#141C21]">
                   <button
                     type="button"
                     onClick={() => setView("grid")}
@@ -734,7 +600,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                       "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
                       view === "grid"
                         ? "bg-[#B6F70B] text-[#0B1100]"
-                        : "text-gray-500 hover:text-white"
+                        : "text-gray-500 hover:text-[#0B1100] dark:hover:text-white"
                     )}
                   >
                     <LayoutGrid className="h-4 w-4" />
@@ -748,7 +614,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                       "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
                       view === "list"
                         ? "bg-[#B6F70B] text-[#0B1100]"
-                        : "text-gray-500 hover:text-white"
+                        : "text-gray-500 hover:text-[#0B1100] dark:hover:text-white"
                     )}
                   >
                     <List className="h-4 w-4" />
@@ -757,24 +623,24 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
               </div>
             </div>
 
-            {loading ? (
+            {isPending ? (
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {[0, 1, 2, 3, 4, 5].map((item) => (
                   <div
                     key={item}
-                    className="h-56 animate-pulse rounded-2xl border border-white/[0.06] bg-[#10191D]"
+                    className="h-56 animate-pulse rounded-2xl border border-[#0B1100]/5 bg-white dark:border-white/[0.06] dark:bg-[#10191D]"
                   />
                 ))}
               </div>
-            ) : pageItems.length === 0 ? (
-              <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#10191D] px-6 py-20 text-center">
+            ) : tuitions.length === 0 ? (
+              <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#0B1100]/15 bg-white px-6 py-20 text-center dark:border-white/10 dark:bg-[#10191D]">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#B6F70B]/20 bg-[#B6F70B]/5">
-                  <Search className="h-6 w-6 text-[#B6F70B]" />
+                  <Search className="h-6 w-6 text-[#78B900] dark:text-[#B6F70B]" />
                 </span>
-                <h2 className="mt-4 text-[15px] font-extrabold text-white">
+                <h2 className="mt-4 text-[15px] font-extrabold">
                   No tuitions found
                 </h2>
-                <p className="mt-1.5 max-w-sm text-[12px] text-gray-500">
+                <p className="mt-1.5 max-w-sm text-[12px] text-[#5A666B] dark:text-gray-500">
                   Try changing your search or clearing a few filters to see more
                   results.
                 </p>
@@ -797,7 +663,7 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                       : "grid-cols-1"
                   )}
                 >
-                  {pageItems.map((tuition) => (
+                  {tuitions.map((tuition) => (
                     <TuitionCard
                       key={tuition.id}
                       tuition={tuition}
@@ -806,32 +672,33 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                   ))}
                 </div>
 
-                {totalPages > 1 && (
+                {pageInfo.totalPages > 1 && (
                   <nav
                     aria-label="Tuition pages"
-                    className="mt-7 flex items-center justify-center gap-1.5"
+                    className="mt-7 flex flex-wrap items-center justify-center gap-1.5"
                   >
                     <button
                       type="button"
-                      onClick={() => setPage((value) => Math.max(1, value - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => goToPage(pageInfo.page - 1)}
+                      disabled={!pageInfo.hasPrev || isPending}
                       aria-label="Previous page"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[#141C21] text-gray-300 transition-colors hover:border-[#B6F70B]/40 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#0B1100]/10 bg-white text-[#101418] transition-colors hover:border-[#B6F70B]/40 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-300"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+                    {Array.from({ length: pageInfo.totalPages }, (_, index) => index + 1).map(
                       (pageNumber) => (
                         <button
                           key={pageNumber}
                           type="button"
-                          onClick={() => setPage(pageNumber)}
-                          aria-current={currentPage === pageNumber ? "page" : undefined}
+                          onClick={() => goToPage(pageNumber)}
+                          disabled={isPending}
+                          aria-current={pageInfo.page === pageNumber ? "page" : undefined}
                           className={cn(
                             "h-8 w-8 rounded-lg border text-[11px] font-bold transition-colors",
-                            currentPage === pageNumber
+                            pageInfo.page === pageNumber
                               ? "border-[#B6F70B] bg-[#B6F70B] text-[#0B1100]"
-                              : "border-white/10 bg-[#141C21] text-gray-300 hover:border-[#B6F70B]/40"
+                              : "border-[#0B1100]/10 bg-white text-[#101418] hover:border-[#B6F70B]/40 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-300"
                           )}
                         >
                           {pageNumber}
@@ -840,12 +707,10 @@ export function TuitionBrowser(initial: TuitionBrowserProps) {
                     )}
                     <button
                       type="button"
-                      onClick={() =>
-                        setPage((value) => Math.min(totalPages, value + 1))
-                      }
-                      disabled={currentPage === totalPages}
+                      onClick={() => goToPage(pageInfo.page + 1)}
+                      disabled={!pageInfo.hasNext || isPending}
                       aria-label="Next page"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[#141C21] text-gray-300 transition-colors hover:border-[#B6F70B]/40 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#0B1100]/10 bg-white text-[#101418] transition-colors hover:border-[#B6F70B]/40 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-[#141C21] dark:text-gray-300"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
+import { useTheme } from "next-themes"
 
 import { useSession } from "@/lib/auth-client"
 import { UserMenu } from "@/components/user-menu"
@@ -28,21 +29,25 @@ const adminNavLinks: NavLink[] = [
 ]
 
 export default function Navbar() {
-  const [isDark, setIsDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const { data: session, isPending } = useSession()
+  // One theme source for the whole app (landing pages + dashboard). The
+  // previous local classList toggle could desync from next-themes / the `d`
+  // hotkey, so it is replaced with setTheme.
+  const { resolvedTheme, setTheme } = useTheme()
+  // True only after hydration, without an effect-driven state update.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
+  const isDark = mounted ? resolvedTheme === "dark" : true
 
   const loggedInUser = session?.user
   const isAdmin = loggedInUser?.role === "admin"
   const navLinks = isAdmin ? adminNavLinks : publicNavLinks
 
-  // Theme Toggle
-  const toggleTheme = () => {
-    const nextTheme = !document.documentElement.classList.contains("dark")
-
-    document.documentElement.classList.toggle("dark", nextTheme)
-    setIsDark(nextTheme)
-  }
+  const toggleTheme = () => setTheme(isDark ? "light" : "dark")
 
   const headerStyle = isDark
     ? "bg-[#080D0F] text-white border-white/10"
@@ -61,7 +66,7 @@ export default function Navbar() {
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2"
-          aria-label="TUITORA Home"
+          aria-label="MentorLagbe Home"
         >
           <svg
             viewBox="0 0 48 40"
@@ -79,7 +84,7 @@ export default function Navbar() {
               isDark ? "text-white" : "text-[#101418]"
             }`}
           >
-            TUITORA
+            MentorLagbe
           </span>
         </Link>
 

@@ -26,6 +26,8 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { cn } from "@/lib/utils"
 import {
   createTuition,
@@ -139,6 +141,7 @@ export default function PostTuitionPage() {
   const [mode, setMode] = React.useState<Mode>("online")
   const [fee, setFee] = React.useState("")
   const [days, setDays] = React.useState("")
+  const [location, setLocation] = React.useState("")
   const [bannerName, setBannerName] = React.useState("")
   const [bannerUrl, setBannerUrl] = React.useState("")
   const [uploading, setUploading] = React.useState(false)
@@ -227,6 +230,7 @@ export default function PostTuitionPage() {
       mode,
       fee,
       days,
+      location,
       bannerName,
       bannerUrl,
       description,
@@ -235,13 +239,20 @@ export default function PostTuitionPage() {
 
     try {
       await createTuition(payload)
+      toast.success("Tuition submitted for admin review")
       setSubmitted(true)
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (submitError) {
       if (isPlanLimitError(submitError)) {
+        toast.info(submitError.message)
         router.replace("/pricing")
         return
       }
+      toast.error(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not submit the tuition. Please try again."
+      )
       setError(
         submitError instanceof Error
           ? submitError.message
@@ -385,6 +396,21 @@ export default function PostTuitionPage() {
             </div>
 
             <input type="hidden" name="mode" value={mode} />
+
+            {/* Location */}
+            <div>
+              <FieldLabel icon={MapPin}>
+                Location (city / area, optional)
+              </FieldLabel>
+              <input
+                type="text"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                maxLength={120}
+                placeholder="e.g. Dhaka, Banani or Online"
+                className="h-10 w-full rounded-lg border border-white/10 bg-[#141C21] px-3 text-[12px] text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-[#B6F70B]/50 focus:ring-2 focus:ring-[#B6F70B]/10"
+              />
+            </div>
 
             {/* Monthly Fee */}
             <div>
@@ -565,7 +591,7 @@ export default function PostTuitionPage() {
           <div className="mt-6 flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => router.push("/dashboard/teacher")}
+              onClick={() => router.push("/dashboard/tutor")}
               className="h-10 rounded-lg border border-white/10 bg-[#141C21] px-5 text-[12px] font-semibold text-gray-300 transition-colors hover:border-white/20 hover:text-white"
             >
               Cancel

@@ -6,12 +6,19 @@
 :root {
   color-scheme: light;
   --site-background: #FFFFFF;
+  --popover: #ffffff;
+  --popover-foreground: #101418;
+  --border: #e9ece8;
+  --radius: 0.75rem;
 }
 
 /* Dark Mode */
 .dark {
   color-scheme: dark;
   --site-background: #050B0E;
+  --popover: #11191c;
+  --popover-foreground: #f5f7f5;
+  --border: rgba(255, 255, 255, 0.1);
 }
 
 /* Entire Website Background */
@@ -24,6 +31,62 @@ body {
   min-height: 100vh;
   margin: 0;
   background-color: var(--site-background);
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode bridge for legacy sections that hard-code dark colours.
+   The theme switch is powered by next-themes; these rules make older
+   dark-only surfaces follow it too, without rewriting every component.
+   ------------------------------------------------------------------------- */
+html:not(.dark) [class~="bg-[#080D0F]"],
+html:not(.dark) [class~="bg-[#050B0E]"],
+html:not(.dark) [class~="bg-[#0B1215]"],
+html:not(.dark) [class~="bg-[#0D1518]"],
+html:not(.dark) [class~="bg-[#0D1417]"],
+html:not(.dark) [class~="bg-[#10191D]"],
+html:not(.dark) [class~="bg-[#142025]"],
+html:not(.dark) [class~="bg-[#1B252B]"],
+html:not(.dark) [class~="bg-[#273136]"],
+html:not(.dark) [class~="bg-[#334047]"],
+html:not(.dark) [class~="bg-[#0F1519]"],
+html:not(.dark) [class~="bg-[#151D22]"],
+html:not(.dark) [class~="bg-[#1A2329]"] {
+  background-color: #f3f7f1 !important;
+}
+
+html:not(.dark) [class~="text-white"] {
+  color: #101418 !important;
+}
+html:not(.dark) [class~="text-gray-200"] {
+  color: #2c363a !important;
+}
+html:not(.dark) [class~="text-gray-300"] {
+  color: #424b50 !important;
+}
+html:not(.dark) [class~="text-gray-400"] {
+  color: #5a666b !important;
+}
+
+/* Subtle entrance animation used on the home-page sections */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    animation: none;
+  }
 }
 
 /* Dual-thumb monthly fee slider used on the browse-tuitions page */

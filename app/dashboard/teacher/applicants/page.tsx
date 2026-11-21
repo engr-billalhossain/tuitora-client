@@ -8,19 +8,22 @@ import {
   Clock3,
   UserRound,
   Users,
+  XCircle,
 } from "lucide-react";
+
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/auth-client";
 import {
-  enrollStudent,
   getTeacherBookings,
+  respondToApplication,
   type BookingRecord,
 } from "@/lib/reviews";
 
-type Filter = "all" | "pending" | "enrolled";
+type Filter = "all" | "pending" | "accepted" | "rejected";
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -62,18 +65,26 @@ export default function TeacherApplicantsPage() {
     };
   }, [session?.user?.id]);
 
-  async function accept(bookingId: string) {
+  async function respond(bookingId: string, action: "accept" | "reject") {
     setBusyId(bookingId);
     setError("");
     try {
-      await enrollStudent(bookingId);
+      await respondToApplication(bookingId, action);
+      toast.success(
+        action === "accept" ? "Application accepted" : "Application rejected"
+      );
       setBookings((current) =>
         current.map((item) =>
-          item.id === bookingId ? { ...item, status: "enrolled" } : item
+          item.id === bookingId
+            ? { ...item, status: action === "accept" ? "accepted" : "rejected" }
+            : item
         )
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add student to course");
+      const message =
+        err instanceof Error ? err.message : "Could not respond to application";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusyId(null);
     }
@@ -94,7 +105,8 @@ export default function TeacherApplicantsPage() {
   });
 
   const pendingCount = bookings.filter((item) => item.status === "pending").length;
-  const enrolledCount = bookings.length - pendingCount;
+  const acceptedCount = bookings.filter((item) => item.status === "accepted").length;
+  const rejectedCount = bookings.filter((item) => item.status === "rejected").length;
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#080D0F] text-white sm:-mx-6 sm:-mt-6">
@@ -125,7 +137,8 @@ export default function TeacherApplicantsPage() {
             [
               { value: "all", label: "All", count: bookings.length },
               { value: "pending", label: "Pending", count: pendingCount },
-              { value: "enrolled", label: "Added to course", count: enrolledCount },
+              { value: "accepted", label: "Added to course", count: acceptedCount },
+              { value: "rejected", label: "Rejected", count: rejectedCount },
             ] as const
           ).map((tab) => (
             <Button
@@ -200,20 +213,35 @@ export default function TeacherApplicantsPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {booking.status === "enrolled" ? (
+                    {booking.status === "accepted" ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#B6F70B]/30 bg-[#B6F70B]/10 px-2.5 py-1 text-[10px] font-bold text-[#B6F70B]">
                         <CheckCircle2 className="h-3 w-3" />
                         Added to course
                       </span>
+                    ) : booking.status === "rejected" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-300">
+                        <XCircle className="h-3 w-3" />
+                        Rejected
+                      </span>
                     ) : (
-                      <Button
-                        type="button"
-                        disabled={busyId === booking.id}
-                        onClick={() => accept(booking.id)}
-                        className="h-9 rounded-lg bg-[#B6F70B] px-4 text-[11px] font-extrabold text-[#0B1100] hover:bg-[#C9FF42] disabled:opacity-60"
-                      >
-                        {busyId === booking.id ? "Adding…" : "Add to course"}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          disabled={busyId === booking.id}
+                          onClick={() => respond(booking.id, "reject")}
+                          className="h-9 rounded-lg border border-rose-500/40 bg-transparent px-3 text-[11px] font-extrabold text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          type="button"
+                          disabled={busyId === booking.id}
+                          onClick={() => respond(booking.id, "accept")}
+                          className="h-9 rounded-lg bg-[#B6F70B] px-4 text-[11px] font-extrabold text-[#0B1100] hover:bg-[#C9FF42] disabled:opacity-60"
+                        >
+                          {busyId === booking.id ? "Adding…" : "Add to course"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </CardContent>

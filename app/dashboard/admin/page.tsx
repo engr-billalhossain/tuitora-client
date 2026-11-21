@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  CreditCard,
   GraduationCap,
   Layers3,
   Menu,
@@ -23,6 +24,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react"
+
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -56,6 +59,7 @@ type AdminStats = {
   pending: number
   approved: number
   declined: number
+  totalRevenue: number
 }
 
 type ActivityItem = {
@@ -176,7 +180,7 @@ function StatCards({ stats }: { stats: AdminStats }) {
     stats.totalUsers === 0 ? 0 : (stats.tutors / stats.totalUsers) * 100
 
   return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <StatCard
         icon={UsersRound}
         label="Total Users"
@@ -261,6 +265,16 @@ function StatCards({ stats }: { stats: AdminStats }) {
             <XCircle className="h-3.5 w-3.5 text-rose-400" />
             Hidden <b className="text-white">{stats.declined}</b>
           </span>
+        </div>
+      </StatCard>
+
+      <StatCard
+        icon={CreditCard}
+        label="Total Stripe Revenue"
+        value={`$${((stats.totalRevenue ?? 0) / 100).toFixed(2)}`}
+      >
+        <div className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] text-gray-400">
+          Confirmed PRO subscription payments
         </div>
       </StatCard>
     </section>
@@ -598,6 +612,7 @@ const EMPTY_OVERVIEW: AdminOverview = {
     pending: 0,
     approved: 0,
     declined: 0,
+    totalRevenue: 0,
   },
   queue: [],
   recentTuitions: [],
@@ -649,10 +664,13 @@ export default function AdminDashboardPage() {
     setBusyId(id)
     try {
       await updateTuitionStatus(id, status)
+      toast.success(
+        status === "approved" ? "Tuition approved" : "Tuition declined"
+      )
       reload()
     } catch (actionError) {
       console.error(actionError)
-      window.alert(
+      toast.error(
         actionError instanceof Error
           ? actionError.message
           : "Could not update the tuition."

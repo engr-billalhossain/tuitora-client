@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { signIn } from "@/lib/auth-client"
+import { refreshAuthToken } from "@/lib/auth-token"
 
 import {
   GraduationCap,
@@ -36,7 +36,6 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { Toaster } from "@/components/ui/sonner"
 
 type UserRole = "student" | "tutor"
 
@@ -103,6 +102,10 @@ export default function SignInPage() {
         return
       }
 
+      // Retrieve a signed JWT for protected backend requests immediately
+      // after the BetterAuth session is established.
+      await refreshAuthToken()
+
       toast.success("Signed in successfully!")
 
       router.push(callbackURL)
@@ -136,8 +139,6 @@ export default function SignInPage() {
 
   return (
     <main className="min-h-screen bg-[#F3F7F1] p-2 transition-colors duration-300 sm:p-4 dark:bg-[#050B0E]">
-      <Toaster />
-
       <div className="mx-auto grid min-h-[calc(100vh-16px)] max-w-[1500px] overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-xl lg:grid-cols-2 dark:border-white/5 dark:bg-[#080D0F]">
         {/* =====================================
             LEFT BRANDING SECTION
@@ -206,7 +207,7 @@ export default function SignInPage() {
               </CardTitle>
 
               <CardDescription className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Sign in to your Tuitora account
+                Sign in to your MentorLagbe account
               </CardDescription>
             </CardHeader>
 
@@ -351,12 +352,9 @@ export default function SignInPage() {
                     </Label>
                   </div>
 
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs font-semibold text-[#76B900] hover:underline dark:text-[#B6F70B]"
-                  >
-                    Forgot password?
-                  </Link>
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                    Need help? Contact an administrator.
+                  </span>
                 </div>
 
                 {/* Sign In Button */}

@@ -1,26 +1,18 @@
 import { getBookings, getTuitions, type Tuition } from "@/lib/actions/postTuitions";
+import { iconForSubject, type SubjectIconKey } from "@/lib/browseIcons";
 import {
   normalizeSlots,
   slotsByIds,
   type TuitionSlot,
 } from "@/lib/slots";
 
+export { iconForSubject, type SubjectIconKey } from "@/lib/browseIcons";
+
 /* ==========================================================================
    Browse-page data model
    Listings come from MongoDB via /api/tuitions and are restricted to posts an
    admin has approved. Pending and declined posts never reach this layer.
    ========================================================================== */
-
-export type SubjectIconKey =
-  | "math"
-  | "physics"
-  | "chemistry"
-  | "biology"
-  | "programming"
-  | "english"
-  | "bangla"
-  | "economics"
-  | "science";
 
 export type BrowseTuition = Tuition & {
   tutorName: string;
@@ -34,19 +26,6 @@ export type BrowseTuition = Tuition & {
   /** Slots still open for booking (booked slots are removed). */
   availableSlots: TuitionSlot[];
 };
-
-export function iconForSubject(subject: string): SubjectIconKey {
-  const value = subject.toLowerCase();
-  if (/chem/.test(value)) return "chemistry";
-  if (/phys/.test(value)) return "physics";
-  if (/bio/.test(value)) return "biology";
-  if (/ict|program|computer|code|software/.test(value)) return "programming";
-  if (/english|ielts|spoken|grammar/.test(value)) return "english";
-  if (/bangla/.test(value)) return "bangla";
-  if (/econ|business|account/.test(value)) return "economics";
-  if (/scien/.test(value)) return "science";
-  return "math";
-}
 
 function decorate(
   tuition: Tuition,
@@ -320,7 +299,49 @@ export function toggleFavorite(tuitionId: string): string[] {
     /* storage unavailable — keep the in-memory result */
   }
   window.dispatchEvent(new Event(FAVORITES_CHANGED_EVENT));
+
+  // Persist to MongoDB for signed-in students (localStorage stays as the
+  // instant/offline mirror). Anonymous users simply keep the local copy.
+  void fetch("/api/favorites", {
+    method: next.includes(tuitionId) ? "POST" : "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tuitionId }),
+  }).catch(() => {
+    /* offline — the local copy is still correct */
+  });
   return next;
+}
+
+/** Loads server-side bookmarks, merges any older local ones, and migrates
+ *  those local-only ids up to the database once. */
+export async function syncFavoritesFromServer(): Promise<string[] | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const response = await fetch("/api/favorites", { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { tuitionIds?: string[] };
+    const remote = Array.isArray(payload.tuitionIds) ? payload.tuitionIds : [];
+    const local = readFavorites();
+    const merged = Array.from(new Set([...remote, ...local]));
+    try {
+      window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(merged));
+    } catch {
+      /* ignore */
+    }
+    for (const id of local) {
+      if (!remote.includes(id)) {
+        void fetch("/api/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tuitionId: id }),
+        }).catch(() => undefined);
+      }
+    }
+    window.dispatchEvent(new Event(FAVORITES_CHANGED_EVENT));
+    return merged;
+  } catch {
+    return null;
+  }
 }
 
 export function readApplications(): BookingApplication[] {

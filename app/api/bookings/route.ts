@@ -2,7 +2,6 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import type { Tuition } from "@/lib/actions/postTuitions";
 import {
   FREE_APPLICATION_LIMIT,
   PLAN_LIMIT_REACHED,
@@ -10,12 +9,13 @@ import {
 import { getDb, idFilter } from "@/lib/mongodb";
 import { isUserPro } from "@/lib/pro";
 import { isSlotId, normalizeSlots, slotLabel } from "@/lib/slots";
-import {
-  getTuitionCollection,
-  serializeTuition,
-} from "@/lib/tuitionDb";
+import { getTuitionCollection, serializeTuition } from "@/lib/tuitionDb";
+import type { Tuition } from "@/lib/actions/postTuitions";
+import { cleanPhone, cleanText, normalizeApplicationStatus } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+type LooseDoc = Record<string, unknown> & { _id?: unknown };
 
 async function getBookingCollection() {
   const db = await getDb();
@@ -27,7 +27,11 @@ async function isTutor(user: { id: string; role?: string }) {
 }
 
 /** Tuition ids owned by a tutor (string id, email or legacy name). */
-async function tutorTuitions(user: { id: string; email?: string | null; name?: string | null }) {
+async function tutorTuitions(user: {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+}) {
   const email = (user.email || "").toLowerCase();
   const name = user.name || "";
   const conditions: Record<string, unknown>[] = [{ tutorId: user.id }];
@@ -38,19 +42,28 @@ async function tutorTuitions(user: { id: string; email?: string | null; name?: s
   return docs.map(serializeTuition);
 }
 
-function bookingView(doc: Record<string, unknown>, tuition?: Tuition) {
+/** Full canonical view of an application, with legacy "enrolled" records normalised. */
+function bookingView(doc: LooseDoc, tuition?: Tuition) {
+  const status = normalizeApplicationStatus(doc.status);
   return {
-    id: String(doc._id),
+    id: String(doc._id ?? ""),
     tuitionId: String(doc.tuitionId ?? ""),
+    tuitionTitle: String(doc.tuitionTitle ?? tuition?.title ?? ""),
+    subject: String(doc.subject ?? tuition?.subject ?? ""),
+    monthlyFee: String(doc.monthlyFee ?? tuition?.monthlyFee ?? tuition?.fee ?? ""),
+    tutorEmail: String(doc.tutorEmail ?? tuition?.tutorEmail ?? ""),
     slotId: String(doc.slotId ?? ""),
     slotLabel: String(doc.slotLabel ?? slotLabel(String(doc.slotId ?? ""))),
     studentId: String(doc.studentId ?? ""),
     studentName: String(doc.studentName ?? ""),
     studentEmail: String(doc.studentEmail ?? ""),
-    status: doc.status === "enrolled" ? "enrolled" : "pending",
-    tuitionTitle: tuition?.title,
-    subject: tuition?.subject,
+    studentPhone: String(doc.studentPhone ?? ""),
+    preferredSchedule: String(doc.preferredSchedule ?? doc.slotLabel ?? ""),
+    studentNote: String(doc.studentNote ?? ""),
+    status,
+    appliedAt: String(doc.appliedAt ?? doc.createdAt ?? ""),
     createdAt: String(doc.createdAt ?? ""),
+    respondedAt: doc.respondedAt ? String(doc.respondedAt) : undefined,
   };
 }
 
@@ -74,7 +87,7 @@ export async function GET(request: Request) {
       if (scope === "mine") {
         filter.studentId = user.id;
       } else {
-        if (!isTutor(user as { id: string; role?: string })) {
+        if (!(await isTutor(user as { id: string; role?: string }))) {
           return NextResponse.json({ error: "Tutor access required" }, { status: 403 });
         }
         tuitions = await tutorTuitions(user);
@@ -89,7 +102,7 @@ export async function GET(request: Request) {
 
     const tuitionById = new Map(tuitions.map((item) => [item.id, item]));
     const bookings = docs.map((doc) =>
-      bookingView(doc, tuitionById.get(String(doc.tuitionId ?? "")))
+      bookingView(doc as LooseDoc, tuitionById.get(String(doc.tuitionId ?? "")))
     );
 
     return NextResponse.json({
@@ -102,7 +115,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** Student books one specific slot of an approved tuition. */
+/** Student submits an application for one specific slot of an approved tuition. */
 export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -110,9 +123,9 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "You must be signed in" }, { status: 401 });
     }
-    const role = (user as { role?: string }).role;
-    if (role && role !== "student") {
-      return NextResponse.json({ error: "Only students can book" }, { status: 403 });
+    const role = String((user as { role?: string }).role ?? "student").toLowerCase();
+    if (role !== "student") {
+      return NextResponse.json({ error: "Only students can apply" }, { status: 403 });
     }
 
     // Free students may apply to up to five tuitions; PRO students are
@@ -135,7 +148,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const tuitionId = String(body.tuitionId ?? "").trim();
+    const tuitionId = cleanText(body.tuitionId, 120);
     const slotId = body.slotId;
     if (!tuitionId || !isSlotId(slotId)) {
       return NextResponse.json(
@@ -144,7 +157,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const alreadyBooked = await collection.findOne({ tuitionId, slotId });
+    // One active application per student per tuition. A rejected application
+    // frees both the slot and the student to apply again.
+    const duplicate = await collection.findOne({
+      tuitionId,
+      studentId: user.id,
+      status: { $ne: "rejected" },
+    });
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "You have already applied for this tuition" },
+        { status: 409 }
+      );
+    }
+
+    // A rejected application frees the slot again.
+    const alreadyBooked = await collection.findOne({
+      tuitionId,
+      slotId,
+      status: { $ne: "rejected" },
+    });
     if (alreadyBooked) {
       return NextResponse.json(
         { error: "This time slot has already been booked" },
@@ -152,11 +184,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const tuitionDoc = await (await getTuitionCollection()).findOne(
-      idFilter(tuitionId)
-    );
+    const tuitionDoc = await (await getTuitionCollection()).findOne(idFilter(tuitionId));
     const tuition = tuitionDoc ? serializeTuition(tuitionDoc) : null;
-    if (!tuition || tuition.status !== "approved") {
+    if (!tuition || tuition.status !== "approved" || !tuition.isActive) {
       return NextResponse.json(
         { error: "This tuition is not available for booking" },
         { status: 404 }
@@ -169,25 +199,43 @@ export async function POST(request: Request) {
       );
     }
 
+    // Identity and fee come from the session/database, never from the browser.
+    const storedUser = (await (await getDb())
+      .collection("user")
+      .findOne(idFilter(user.id), { projection: { phone: 1 } })) as LooseDoc | null;
+    const now = new Date().toISOString();
+    const schedule = slotLabel(slotId);
+
     await collection.insertOne({
       tuitionId,
+      tuitionTitle: tuition.title,
+      subject: tuition.subject,
+      monthlyFee: tuition.monthlyFee,
+      tutorEmail: tuition.tutorEmail || "",
+      tutorName: tuition.tutorName || "",
       slotId,
-      slotLabel: slotLabel(slotId),
+      slotLabel: schedule,
       studentId: user.id,
       studentName: user.name || "",
-      studentEmail: user.email || "",
+      studentEmail: String(user.email || "").toLowerCase(),
+      studentPhone:
+        cleanPhone(body.studentPhone) || cleanPhone(storedUser?.phone),
+      preferredSchedule:
+        cleanText(body.preferredSchedule, 120) || schedule,
+      studentNote: cleanText(body.studentNote ?? body.learningNote, 500),
       status: "pending",
-      createdAt: new Date().toISOString(),
+      appliedAt: now,
+      createdAt: now,
     });
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
-    console.error("Failed to save booking:", error);
-    return NextResponse.json({ error: "Failed to save booking" }, { status: 500 });
+    console.error("Failed to save application:", error);
+    return NextResponse.json({ error: "Failed to save application" }, { status: 500 });
   }
 }
 
-/** Tutor adds an applicant to their course, which unlocks student reviews. */
+/** Tutor accepts or rejects an application they own. */
 export async function PATCH(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -195,18 +243,26 @@ export async function PATCH(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "You must be signed in" }, { status: 401 });
     }
-    if (!isTutor(user as { id: string; role?: string })) {
-      return NextResponse.json({ error: "Only tutors can add students" }, { status: 403 });
+    if (!(await isTutor(user as { id: string; role?: string }))) {
+      return NextResponse.json({ error: "Only tutors can respond to applications" }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const bookingId = String(body.bookingId ?? body.id ?? "").trim();
+    const bookingId = cleanText(body.bookingId ?? body.id, 120);
+    const action = String(body.action ?? "accept").toLowerCase();
     if (!bookingId) {
-      return NextResponse.json({ error: "A booking is required" }, { status: 400 });
+      return NextResponse.json({ error: "An application is required" }, { status: 400 });
     }
+    if (action !== "accept" && action !== "reject") {
+      return NextResponse.json(
+        { error: "Action must be 'accept' or 'reject'" },
+        { status: 400 }
+      );
+    }
+    const nextStatus = action === "accept" ? "accepted" : "rejected";
 
     const collection = await getBookingCollection();
-    const booking = await collection.findOne(idFilter(bookingId));
+    const booking = (await collection.findOne(idFilter(bookingId))) as LooseDoc | null;
     if (!booking) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
@@ -216,19 +272,39 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "This application is not yours" }, { status: 403 });
     }
 
+    const current = normalizeApplicationStatus(booking.status);
+    if (current === nextStatus) {
+      return NextResponse.json({ ok: true, status: nextStatus });
+    }
+    if (current !== "pending") {
+      return NextResponse.json(
+        { error: "This application has already been reviewed" },
+        { status: 409 }
+      );
+    }
+
+    const now = new Date().toISOString();
     await collection.updateOne(
-      { _id: booking._id },
-      { $set: { status: "enrolled", enrolledAt: new Date().toISOString() } }
+      idFilter(String(booking._id)),
+      {
+        $set: {
+          status: nextStatus,
+          applicationStatus: nextStatus,
+          respondedAt: now,
+          respondedBy: user.id,
+          ...(action === "accept" ? { enrolledAt: now } : {}),
+        },
+      }
     );
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, status: nextStatus });
   } catch (error) {
-    console.error("Failed to add student to course:", error);
-    return NextResponse.json({ error: "Failed to add student to course" }, { status: 500 });
+    console.error("Failed to respond to application:", error);
+    return NextResponse.json({ error: "Failed to respond to application" }, { status: 500 });
   }
 }
 
-/** Student cancels their own booking for a slot, freeing it for everyone. */
+/** Student cancels their own pending application, freeing the slot. */
 export async function DELETE(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -236,14 +312,14 @@ export async function DELETE(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "You must be signed in" }, { status: 401 });
     }
-    const role = (user as { role?: string }).role;
-    if (role && role !== "student") {
-      return NextResponse.json({ error: "Only students can cancel a booking" }, { status: 403 });
+    const role = String((user as { role?: string }).role ?? "student").toLowerCase();
+    if (role !== "student") {
+      return NextResponse.json({ error: "Only students can cancel an application" }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const tuitionId = String(body.tuitionId ?? "").trim();
-    const slotId = String(body.slotId ?? "").trim();
+    const tuitionId = cleanText(body.tuitionId, 120);
+    const slotId = cleanText(body.slotId, 40);
     if (!tuitionId || !slotId) {
       return NextResponse.json(
         { error: "A valid tuition and time slot are required" },
@@ -252,12 +328,10 @@ export async function DELETE(request: Request) {
     }
 
     const collection = await getBookingCollection();
-    // Only the student who made the booking may remove it.
     await collection.deleteOne({ tuitionId, slotId, studentId: user.id });
-
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Failed to cancel booking:", error);
-    return NextResponse.json({ error: "Failed to cancel booking" }, { status: 500 });
+    console.error("Failed to cancel application:", error);
+    return NextResponse.json({ error: "Failed to cancel application" }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
+import { listPayments } from "@/lib/payments";
 import { normalizeStatus, serializeTuition } from "@/lib/tuitionDb";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +37,17 @@ export async function GET() {
 
     const db = await getDb();
 
-    const [userDocs, tuitionDocs] = await Promise.all([
+    const [userDocs, tuitionDocs, payments] = await Promise.all([
       db.collection("user").find({}).toArray(),
       db.collection("courses").find({}).sort({ createdAt: -1 }).toArray(),
+      listPayments(),
     ]);
+
+    // Amounts are stored in cents, exactly as Stripe reported them.
+    const totalRevenue = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount || 0),
+      0
+    );
 
     const users = userDocs as LooseDoc[];
     const tuitions = tuitionDocs as LooseDoc[];
@@ -132,6 +140,7 @@ export async function GET() {
         pending,
         approved,
         declined,
+        totalRevenue,
       },
       queue,
       recentTuitions,

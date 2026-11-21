@@ -12,6 +12,7 @@ function SuccessInner() {
   const searchParams = useSearchParams();
   const { refetch } = useSession();
   const paymentIntentId = searchParams.get("payment_intent") ?? "";
+  const sessionId = searchParams.get("session_id") ?? "";
 
   const [status, setStatus] = React.useState<"checking" | "done" | "error">(
     "checking"
@@ -22,7 +23,7 @@ function SuccessInner() {
     let cancelled = false;
 
     async function confirm() {
-      if (!paymentIntentId) {
+      if (!paymentIntentId && !sessionId) {
         setStatus("error");
         setMessage("No payment reference was provided.");
         return;
@@ -31,7 +32,7 @@ function SuccessInner() {
         const response = await fetch("/api/stripe/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentIntentId }),
+          body: JSON.stringify({ paymentIntentId, sessionId }),
         });
         const data = await response.json();
         if (cancelled) return;
@@ -54,7 +55,7 @@ function SuccessInner() {
     return () => {
       cancelled = true;
     };
-  }, [paymentIntentId, refetch, router]);
+  }, [paymentIntentId, sessionId, refetch, router]);
 
   return (
     <main className="flex min-h-[75vh] items-center justify-center bg-[#050B0E] px-5 text-white">

@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
-import { signUp, signIn, authClient } from "@/lib/auth-client"
+import { signUp, signIn } from "@/lib/auth-client"
+import { refreshAuthToken } from "@/lib/auth-token"
 
 import {
   GraduationCap,
@@ -34,7 +35,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
 
 type UserRole = "student" | "tutor"
 
@@ -78,15 +78,6 @@ export default function SignUpPage() {
 
 
 
-
-  const handleSignUp = async (data: { name: string; email: string; password: string }) => {
-    const { data : signUpData, error } = await authClient.signUp.email({
-    name: data.name,
-    email: data.email,
-    password: data.password,
-    callbackURL: "/",
-});
-  }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -148,6 +139,8 @@ export default function SignUpPage() {
         return
       }
 
+      await refreshAuthToken()
+
       toast.success("Account created successfully!");
 
       setTimeout(() => {
@@ -187,8 +180,6 @@ export default function SignUpPage() {
 
   return (
     <main className="min-h-screen bg-[#F3F7F1] p-2 transition-colors duration-300 sm:p-4 dark:bg-[#050B0E]">
-      <Toaster />
-
       <div className="mx-auto grid min-h-[calc(100vh-16px)] max-w-[1500px] overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-xl lg:grid-cols-2 dark:border-white/5 dark:bg-[#080D0F]">
         {/* ==================================
             LEFT BRANDING SECTION
@@ -203,7 +194,7 @@ export default function SignUpPage() {
 
           <div className="relative z-10 mt-12 max-w-[400px]">
             <h1 className="text-3xl leading-[1.2] font-extrabold tracking-tight text-[#101418] sm:text-[39px] dark:text-white">
-              Join Tuitora and Start Your{" "}
+              Join MentorLagbe and Start Your{" "}
               <span className="text-[#76B900] dark:text-[#B6F70B]">
                 Learning Journey
               </span>
@@ -494,7 +485,7 @@ export default function SignUpPage() {
               <p className="mt-5 text-center text-sm text-gray-700 dark:text-gray-300">
                 Already have an account?{" "}
                 <Link
-                  href="/login"
+                  href="/sign-in"
                   className="font-bold text-[#76B900] hover:underline dark:text-[#B6F70B]"
                 >
                   Sign In

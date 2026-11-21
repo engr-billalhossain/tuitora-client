@@ -81,12 +81,12 @@ export default function Footer() {
             <Link
               href="/"
               className="mb-5 flex w-fit items-center gap-2"
-              aria-label="Tuitora Home"
+              aria-label="MentorLagbe Home"
             >
               <GraduationCap className="h-8 w-8 text-[#B6F70B]" />
 
               <span className="text-[23px] font-extrabold tracking-tight text-white">
-                TUITORA
+                MentorLagbe
               </span>
             </Link>
 
@@ -146,10 +146,10 @@ export default function Footer() {
                 <Mail className="h-4 w-4 shrink-0 text-[#D9F69A]" />
 
                 <a
-                  href="mailto:support@tuitora.com"
+                  href="mailto:support@mentorlagbe.com"
                   className="text-[11px] text-gray-300 transition-colors hover:text-[#B6F70B]"
                 >
-                  support@tuitora.com
+                  support@mentorlagbe.com
                 </a>
               </li>
 
@@ -218,9 +218,9 @@ export default function Footer() {
         {/* Copyright */}
 
         <div className="flex flex-col items-start justify-between gap-3 py-5 text-[11px] text-gray-400 sm:flex-row sm:items-center">
-          <p>© 2026 Tuitora. All rights reserved.</p>
+          <p>© 2026 MentorLagbe. All rights reserved.</p>
 
-          <p>Learning Platform (Tuitora)</p>
+          <p>Tuition &amp; Mentorship Platform (MentorLagbe)</p>
         </div>
       </div>
     </footer>

@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     const enrolled = await (await getBookingCollection()).findOne({
       tuitionId,
       studentId: user.id,
-      status: "enrolled",
+      status: { $in: ["enrolled", "accepted"] },
     });
     if (!enrolled) {
       return NextResponse.json(

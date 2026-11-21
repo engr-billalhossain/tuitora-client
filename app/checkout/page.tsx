@@ -57,6 +57,7 @@ function CheckoutInner() {
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [paying, setPaying] = React.useState(false);
+  const [hostedLoading, setHostedLoading] = React.useState(false);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const stripeRef = React.useRef<Stripe | null>(null);
@@ -187,6 +188,37 @@ function CheckoutInner() {
     }
   }
 
+  async function startHostedCheckout() {
+    if (hostedLoading) return;
+    setHostedLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/stripe/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        alreadyPro?: boolean;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error || "Could not start checkout");
+      if (data.alreadyPro) {
+        setAlreadyPro(true);
+        return;
+      }
+      if (!data.url) throw new Error("Stripe did not return a checkout URL");
+      window.location.assign(data.url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not start checkout";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setHostedLoading(false);
+    }
+  }
+
   if (isPending) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-[#050B0E] text-white">
@@ -314,6 +346,26 @@ function CheckoutInner() {
             )}
           </section>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-white/10 bg-[#0B1215] p-6 text-center">
+          <h2 className="text-sm font-bold text-white">Prefer Stripe Checkout?</h2>
+          <p className="mt-1 text-[12px] text-gray-500">
+            Pay on Stripe&apos;s secure hosted page. The price is fixed by the server.
+          </p>
+          <button
+            type="button"
+            onClick={startHostedCheckout}
+            disabled={hostedLoading}
+            className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl border border-[#B6F70B]/50 px-6 text-[13px] font-extrabold text-[#B6F70B] transition-colors hover:bg-[#B6F70B]/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {hostedLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            {hostedLoading ? "Redirecting..." : "Continue to Stripe Checkout"}
+          </button>
+        </section>
       </div>
     </main>
   );
