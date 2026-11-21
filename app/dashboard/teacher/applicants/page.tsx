@@ -54,7 +54,9 @@ export default function TeacherApplicantsPage() {
       })
       .catch((err) => {
         if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load applicants");
+          const message = err instanceof Error ? err.message : "Failed to load applicants";
+          setError(message);
+          toast.error(message);
         }
       })
       .finally(() => {

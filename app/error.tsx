@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Error({
   error,
@@ -13,6 +14,12 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    toast.error("Something went wrong", {
+      description:
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "We could not load this page.",
+    });
   }, [error]);
 
   return (

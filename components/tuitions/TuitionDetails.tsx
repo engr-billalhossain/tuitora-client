@@ -22,6 +22,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useSession } from "@/lib/auth-client";
 import {
@@ -94,7 +95,10 @@ export function TuitionDetails() {
       })
       .catch((error) => {
         console.error(`Failed to load tuition ${tuitionId}:`, error);
-        if (active) setTuitions([]);
+        if (active) {
+          setTuitions([]);
+          toast.error("Could not load this tuition. Please try again.");
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -141,7 +145,10 @@ export function TuitionDetails() {
           setMyReviews(reviewList);
         }
       })
-      .catch((error) => console.error("Failed to load review data:", error));
+      .catch((error) => {
+        console.error("Failed to load review data:", error);
+        if (active) toast.error("Could not load your review data.");
+      });
     return () => {
       active = false;
     };
@@ -261,7 +268,14 @@ export function TuitionDetails() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toggleFavorite(tuition.id)}
+                  onClick={() => {
+                    const next = toggleFavorite(tuition.id);
+                    toast.success(
+                      next.includes(tuition.id)
+                        ? "Added to your wishlist"
+                        : "Removed from your wishlist"
+                    );
+                  }}
                   aria-label={favorite ? "Remove from wishlist" : "Add to wishlist"}
                   aria-pressed={favorite}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[#0F171B] text-gray-500 transition-colors hover:border-rose-400/40 hover:text-rose-400"

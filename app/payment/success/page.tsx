@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Crown, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { useSession } from "@/lib/auth-client";
 
@@ -18,12 +19,20 @@ function SuccessInner() {
     "checking"
   );
   const [message, setMessage] = React.useState("");
+  // Guard against duplicate popups (StrictMode double-invokes effects in dev).
+  const notified = React.useRef(false);
 
   React.useEffect(() => {
     let cancelled = false;
 
     async function confirm() {
       if (!paymentIntentId && !sessionId) {
+        if (!notified.current) {
+          notified.current = true;
+          toast.error("Payment confirmation failed", {
+            description: "No payment reference was provided.",
+          });
+        }
         setStatus("error");
         setMessage("No payment reference was provided.");
         return;
@@ -41,12 +50,28 @@ function SuccessInner() {
         }
         // Pull the fresh session so the PRO badge appears everywhere.
         await refetch();
-        if (!cancelled) setStatus("done");
+        if (!cancelled) {
+          if (!notified.current) {
+            notified.current = true;
+            toast.success("Payment successful — you're PRO now!", {
+              description: "All PRO features are unlocked on your account.",
+            });
+          }
+          setStatus("done");
+        }
         router.refresh();
       } catch (err) {
         if (!cancelled) {
+          const text =
+            err instanceof Error ? err.message : "Verification failed";
+          if (!notified.current) {
+            notified.current = true;
+            toast.error("Could not confirm your payment", {
+              description: text,
+            });
+          }
           setStatus("error");
-          setMessage(err instanceof Error ? err.message : "Verification failed");
+          setMessage(text);
         }
       }
     }

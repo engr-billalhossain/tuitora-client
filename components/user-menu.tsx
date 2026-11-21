@@ -136,6 +136,10 @@ export function UserMenu({ user }: { user: MenuUser }) {
       setOpen(false)
       router.push("/")
       router.refresh()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not sign out. Please try again."
+      )
     } finally {
       setSigningOut(false)
     }

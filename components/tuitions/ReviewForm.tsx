@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertCircle, CheckCircle2, Star } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,15 +32,21 @@ export function ReviewForm({
     setError("");
     if (!rating) {
       setError("Please choose a star rating.");
+      toast.error("Please choose a star rating.");
       return;
     }
     setBusy(true);
     try {
       await createReview({ tuitionId, rating, comment });
       setDone(true);
+      toast.success("Review submitted — thanks for the feedback!", {
+        description: `Your review of ${tutorName} is now public.`,
+      });
       onReviewed?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save your review.");
+      const message = err instanceof Error ? err.message : "Could not save your review.";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }

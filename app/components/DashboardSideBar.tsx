@@ -257,6 +257,10 @@ function SignOutButton() {
       toast.success("Signed out successfully")
       router.replace("/sign-in")
       router.refresh()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not sign out. Please try again."
+      )
     } finally {
       setSigningOut(false)
     }

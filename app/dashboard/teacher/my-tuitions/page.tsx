@@ -244,6 +244,11 @@ export default function MyTuitionsPage() {
         if (!active) return
         console.error("Failed to load your tuitions:", loadError)
         setError(true)
+        toast.error(
+          loadError instanceof Error
+            ? loadError.message
+            : "Could not load your tuitions."
+        )
       })
       .finally(() => {
         if (active) setLoading(false)

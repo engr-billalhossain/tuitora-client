@@ -119,6 +119,7 @@ export default function SignUpPage() {
     setErrors(newErrors)
 
     if (Object.keys(newErrors).length > 0) {
+      toast.error(Object.values(newErrors)[0] || "Please fix the highlighted fields")
       return
     }
 

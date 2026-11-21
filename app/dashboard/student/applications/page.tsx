@@ -108,7 +108,10 @@ export default function StudentApplicationsPage() {
         setBookings(bookingList);
         setReviews(reviewList);
       })
-      .catch((error) => console.error("Failed to load review data:", error));
+      .catch((error) => {
+        console.error("Failed to load review data:", error);
+        toast.error("Could not load your applications data.");
+      });
   }, []);
 
   React.useEffect(() => {

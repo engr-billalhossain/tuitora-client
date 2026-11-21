@@ -451,7 +451,10 @@ export default function AdminTuitionsPage() {
       })
       .catch((loadError) => {
         console.error("Failed to load tuitions:", loadError)
-        if (active) setError(true)
+        if (active) {
+          setError(true)
+          toast.error("Could not load tuitions. Please try refreshing.")
+        }
       })
       .finally(() => {
         if (active) setLoading(false)

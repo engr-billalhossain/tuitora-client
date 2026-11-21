@@ -1,9 +1,21 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PaymentCancelPage() {
+  const notified = React.useRef(false);
+
+  React.useEffect(() => {
+    if (notified.current) return;
+    notified.current = true;
+    toast.info("Payment cancelled", {
+      description: "No charge was made. You can try again whenever you're ready.",
+    });
+  }, []);
+
   return (
     <main className="flex min-h-[75vh] items-center justify-center bg-[#050B0E] px-5 text-white">
       <div className="w-full max-w-md rounded-2xl border border-[#1E2A2E] bg-[#0B1215] p-8 text-center">

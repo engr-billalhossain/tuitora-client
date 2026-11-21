@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Bookmark, Loader2, RotateCcw, Search } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   FAVORITES_CHANGED_EVENT,
@@ -19,19 +20,26 @@ export default function SavedTuitionsPage() {
 
   const load = React.useCallback(() => {
     let active = true;
-    syncFavoritesFromServer().then(() => {
-      const ids = new Set(readFavorites());
-      getBrowseData()
-        .then((result) => {
-          if (active) setTuitions(result.tuitions.filter((item) => ids.has(item.id)));
-        })
-        .catch(() => {
-          if (active) setTuitions([]);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
-        });
-    });
+    syncFavoritesFromServer()
+      .catch(() => {
+        if (active) toast.error("Could not sync your saved tuitions.");
+      })
+      .then(() => {
+        const ids = new Set(readFavorites());
+        getBrowseData()
+          .then((result) => {
+            if (active) setTuitions(result.tuitions.filter((item) => ids.has(item.id)));
+          })
+          .catch(() => {
+            if (active) {
+              setTuitions([]);
+              toast.error("Could not load your saved tuitions.");
+            }
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          });
+      });
     return () => {
       active = false;
     };

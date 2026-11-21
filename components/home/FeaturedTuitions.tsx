@@ -13,6 +13,7 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +45,10 @@ export function FeaturedTuitions() {
           .slice(0, 6);
         setTuitions(visible);
       })
-      .catch((error) => console.error("Failed to load featured tuitions:", error))
+      .catch((error) => {
+        console.error("Failed to load featured tuitions:", error);
+        if (active) toast.error("Could not load featured tuitions.");
+      })
       .finally(() => {
         if (active) setLoading(false);
       });

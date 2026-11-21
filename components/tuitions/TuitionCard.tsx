@@ -16,6 +16,7 @@ import {
   UsersRound,
   Video,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   FAVORITES_CHANGED_EVENT,
@@ -51,7 +52,14 @@ function SaveButton({ tuitionId }: { tuitionId: string }) {
       type="button"
       aria-label={saved ? "Remove from saved tuitions" : "Save tuition"}
       title={saved ? "Remove from saved tuitions" : "Save tuition"}
-      onClick={() => toggleFavorite(tuitionId)}
+      onClick={() => {
+        const next = toggleFavorite(tuitionId);
+        toast.success(
+          next.includes(tuitionId)
+            ? "Saved to your favorites"
+            : "Removed from saved tuitions"
+        );
+      }}
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#0B1100]/10 dark:border-white/10 bg-white/[0.04] text-gray-400 transition-colors hover:border-[#B6F70B]/50 hover:text-[#B6F70B]"
     >
       <Heart className={cn("h-4 w-4", saved && "fill-[#B6F70B] text-[#B6F70B]")} />

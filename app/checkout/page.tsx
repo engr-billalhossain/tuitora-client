@@ -92,6 +92,7 @@ function CheckoutInner() {
           throw new Error(data.error || "Could not start checkout");
         }
         if (data.alreadyPro) {
+          toast.info("You're already PRO — no payment needed.");
           setAlreadyPro(true);
           return;
         }
@@ -101,7 +102,9 @@ function CheckoutInner() {
         setSetup(data as PaymentSetup);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not start checkout");
+          const message = err instanceof Error ? err.message : "Could not start checkout";
+          setError(message);
+          toast.error(message);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -137,7 +140,9 @@ function CheckoutInner() {
         elementsRef.current = elements;
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load payment form");
+          const message = err instanceof Error ? err.message : "Could not load payment form";
+          setError(message);
+          toast.error(message);
         }
       }
     }
@@ -174,6 +179,7 @@ function CheckoutInner() {
       }
       if (paymentIntent) {
         if (paymentIntent.status === "succeeded") {
+          toast.success("Payment successful! Activating your PRO features...");
           router.push(returnUrl);
         } else {
           throw new Error(`Payment status: ${paymentIntent.status}`);
@@ -205,6 +211,7 @@ function CheckoutInner() {
       };
       if (!response.ok) throw new Error(data.error || "Could not start checkout");
       if (data.alreadyPro) {
+        toast.info("You're already PRO — no payment needed.");
         setAlreadyPro(true);
         return;
       }

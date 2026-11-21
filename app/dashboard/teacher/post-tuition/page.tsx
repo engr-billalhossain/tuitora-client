@@ -167,6 +167,7 @@ export default function PostTuitionPage() {
       })
       .catch(() => {
         // The API still enforces the limit when submitting the form.
+        toast.error("Could not verify your tuition limit. You can still try publishing.")
       })
     return () => {
       active = false
@@ -196,11 +197,12 @@ export default function PostTuitionPage() {
       setBannerUrl(result.url)
     } catch (uploadFailure) {
       clearBanner()
-      setUploadError(
+      const message =
         uploadFailure instanceof Error
           ? uploadFailure.message
           : "Could not upload the image. Please try again."
-      )
+      setUploadError(message)
+      toast.error(message)
     } finally {
       setUploading(false)
     }
@@ -213,12 +215,14 @@ export default function PostTuitionPage() {
 
     if (uploading) {
       setError("Please wait for the banner image to finish uploading.")
+      toast.error("Please wait for the banner image to finish uploading.")
       setSubmitting(false)
       return
     }
 
     if (slots.length === 0) {
       setError("Please select at least one available time slot.")
+      toast.error("Please select at least one available time slot.")
       setSubmitting(false)
       return
     }

@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight, TrendingUp, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,7 +48,10 @@ export function MostAppliedSubjects() {
               ]
         );
       })
-      .catch((error) => console.error("Failed to load applied subjects:", error))
+      .catch((error) => {
+        console.error("Failed to load applied subjects:", error);
+        if (active) toast.error("Could not load popular subjects.");
+      })
       .finally(() => {
         if (active) setLoading(false);
       });

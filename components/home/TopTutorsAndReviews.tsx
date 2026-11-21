@@ -10,6 +10,7 @@ import {
   Star,
   Trophy,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -110,7 +111,10 @@ export function TopTutorsAndReviews() {
       .then((list) => {
         if (active) setReviews(list);
       })
-      .catch((error) => console.error("Failed to load reviews:", error))
+      .catch((error) => {
+        console.error("Failed to load reviews:", error);
+        if (active) toast.error("Could not load top tutors and reviews.");
+      })
       .finally(() => {
         if (active) setLoading(false);
       });

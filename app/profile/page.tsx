@@ -64,7 +64,11 @@ export default function ProfilePage() {
         setImage(payload.profile.image);
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "Could not load profile");
+        if (active) {
+          const message = err instanceof Error ? err.message : "Could not load profile";
+          setError(message);
+          toast.error(message);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);

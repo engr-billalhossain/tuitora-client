@@ -649,7 +649,10 @@ export default function AdminDashboardPage() {
       })
       .catch((loadError) => {
         console.error(loadError)
-        if (active) setError(true)
+        if (active) {
+          setError(true)
+          toast.error("Could not load the admin overview. Please try refreshing.")
+        }
       })
       .finally(() => {
         if (active) setLoading(false)

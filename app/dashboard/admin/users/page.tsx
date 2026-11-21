@@ -153,7 +153,11 @@ export default function AdminUsersPage() {
       })
       .catch((loadError) => {
         console.error(loadError)
-        if (active) setError("Could not load users. Please try refreshing.")
+        if (active) {
+          const message = "Could not load users. Please try refreshing."
+          setError(message)
+          toast.error(message)
+        }
       })
       .finally(() => {
         if (active) setLoading(false)

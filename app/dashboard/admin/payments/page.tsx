@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertCircle, CreditCard, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 /* Data comes from GET /api/admin/payments — admin-only transaction ledger. */
 
@@ -50,7 +51,9 @@ export default function AdminPaymentsPage() {
         setError("");
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Could not load payments");
+        const message = err instanceof Error ? err.message : "Could not load payments";
+        setError(message);
+        toast.error(message);
       })
       .finally(() => setLoading(false));
   }, []);
