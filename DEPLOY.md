@@ -31,6 +31,23 @@ This is a standard Next.js App Router app. **No `vercel.json` is needed** — Ve
 4. MongoDB Atlas → **Network Access** → allow `0.0.0.0/0` (same as the backend).
 5. **Redeploy** after any env change.
 
+### Optional: set the variables from the local `.env` automatically
+
+Instead of adding them one by one in the dashboard, log in and link the repo once:
+
+```bash
+npx vercel login
+npx vercel link --yes
+```
+
+Then push every key (localhost URLs are rewritten to the deployed URLs):
+
+```bash
+npm run setup:vercel -- https://<your-frontend>.vercel.app https://<your-backend>.vercel.app
+```
+
+Preview with `npm run setup:vercel -- https://<your-frontend>.vercel.app --dry-run` first if you want to see the keys (secrets stay masked). Redeploy afterwards so `NEXT_PUBLIC_*` values are baked into the client bundle.
+
 ## External services to update
 
 - **Google Cloud Console → Credentials → OAuth client** — add this Authorized redirect URI:
