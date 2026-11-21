@@ -50,10 +50,12 @@ Preview with `npm run setup:vercel -- https://<your-frontend>.vercel.app --dry-r
 
 ## External services to update
 
-- **Google Cloud Console → Credentials → OAuth client** — add this Authorized redirect URI:
+- **Google Cloud Console → Credentials → OAuth client** — add these Authorized redirect URIs (under **APIs & Services → Credentials → your OAuth 2.0 Client ID → Authorized redirect URIs**):
   ```
+  http://localhost:3000/api/auth/callback/google
   https://<your-frontend>.vercel.app/api/auth/callback/google
   ```
+  Missing the localhost entry makes Google return `redirect_uri_mismatch` and Google sign-in never completes locally. The values must match `BETTER_AUTH_URL` exactly (no trailing slash).
 - **Stripe Dashboard → Webhooks → Add endpoint**:
   ```
   https://<your-frontend>.vercel.app/api/stripe/webhook

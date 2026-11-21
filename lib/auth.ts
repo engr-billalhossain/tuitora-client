@@ -40,6 +40,18 @@ const SERVER_OWNED_FIELDS = [
   "stripePaymentIntentId",
 ] as const;
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
+
+if (!googleClientId || !googleClientSecret) {
+  // Warn instead of throwing so `next build` still succeeds before all env
+  // vars are configured (e.g. the first Vercel deploy). Google sign-in simply
+  // cannot complete until they are set.
+  console.warn(
+    "[auth] GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are missing. Google sign-in will not work until they are configured (see .env.example)."
+  )
+}
+
 export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
@@ -124,8 +136,8 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: googleClientId as string,
+      clientSecret: googleClientSecret as string,
     },
   },
 

@@ -334,7 +334,9 @@ When configuring Stripe, use **USD** and ensure the price matches the constants 
 
 | Symptom | Likely fix |
 |---|---|
-| Auth redirects to `http://localhost:3000` unexpectedly | `lib/auth-client.ts` hard-codes that base URL; change it to your deployed origin |
+| Auth redirects to `http://localhost:3000` unexpectedly | `lib/auth-client.ts` now uses the page's own origin. If you serve auth from a different public origin, set `NEXT_PUBLIC_BETTER_AUTH_URL` and keep `BETTER_AUTH_URL` in sync. |
+| Google says `redirect_uri_mismatch` (or Google sign-in never completes) | **This is the usual cause.** Add `http://localhost:3000/api/auth/callback/google` (and your deployed `<origin>/api/auth/callback/google`) under **Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 Client → Authorized redirect URIs**, then save. The URI must match `BETTER_AUTH_URL` exactly. |
+| Google sign-in shows the "Sign-in could not be completed" page | The `error` code on that page names the cause (cancelled, expired state, bad credentials, etc.). Failed OAuth callbacks now land on a real page instead of a 404. |
 | `MONGODB_URI is not set` / Stripe errors at startup | Fill in the required variables in `.env` and restart the dev server |
 | Stripe webhook signature fails | Use the local `whsec_...` from `stripe listen` in `STRIPE_WEBHOOK_SECRET`; forward raw body to `/api/stripe/webhook` |
 | Image upload fails | Check `IMAGEBB_API_KEY`; images are uploaded server-side via `app/api/upload` |
